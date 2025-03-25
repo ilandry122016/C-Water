@@ -298,10 +298,13 @@ blur (GimpDrawable *drawable)
             }
 
        }
-      outrow[0] = 0;
-      outrow[1] = 0;
-      outrow[2] = 0;
-
+      if (i == 0){
+	
+	outrow[0] = 0;
+	outrow[1] = 0;
+	outrow[2] = 0;
+      }
+      
       // outrow[0] = 0;
       // outrow = row;
        gimp_pixel_rgn_set_row (&rgn_out,
