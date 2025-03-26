@@ -264,6 +264,12 @@ blur (GimpDrawable *drawable)
               /*       row3[channels * MIN ((j + 1 - x1), x2 - x1 - 1) + k];  */
               outrow[channels * (j - x1) + k] = row2[channels * (j - x1) + k];
               // outrow[0] = 0;
+              if (i == 2 && j == 2) {
+              outrow[channels * (j - x1) + k] = 0;
+		/* outrow[0] = 0; */
+		/* outrow[1] = 0; */
+		//outrow[2] = 0;
+	      }
             }
 
        }
