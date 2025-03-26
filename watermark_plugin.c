@@ -130,37 +130,6 @@ run (const gchar      *name,
 
 	/*  Get the specified drawable  */
 	drawable = gimp_drawable_get (param[2].data.d_drawable);
-
-	/* switch (run_mode) */
-	/*   { */
-	/*   case GIMP_RUN_INTERACTIVE: */
-	/*     /\* Get options last values if needed *\/ */
-	/*     printf("Crash point at bvals.\n"); */
-	/*     gimp_get_data ("plug-in-myblur", &bvals); */
-
-	/*     /\* Display the dialog *\/ */
-	/*     printf("Crash point in run.\n"); */
-	/*     if (! blur_dialog (drawable)){ */
-	/*       return; */
-	/*     } */
-	/*     printf("Crash point after blur_dialog.\n"); */
-	/*     break; */
-
-	/*   case GIMP_RUN_NONINTERACTIVE: */
-	/*     if (nparams != 4) */
-	/*       status = GIMP_PDB_CALLING_ERROR; */
-	/*     if (status == GIMP_PDB_SUCCESS) */
-	/*       bvals.radius = param[3].data.d_int32; */
-	/*     break; */
-
-	/*   case GIMP_RUN_WITH_LAST_VALS: */
-	/*     /\*  Get options last values if needed  *\/ */
-	/*     gimp_get_data ("plug-in-myblur", &bvals); */
-	/*     break; */
-
-	/*   default: */
-	/*     break; */
-	/*   } */
 	
 	gimp_progress_init ("My Blur...");
 
@@ -320,6 +289,8 @@ blur (GimpDrawable *drawable)
   g_free (row2);
   g_free (row3);
   g_free (outrow);
+
+  printf(outrow);
 
   gimp_drawable_flush (drawable);
   gimp_drawable_merge_shadow (drawable->drawable_id, TRUE);
