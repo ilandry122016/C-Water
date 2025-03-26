@@ -273,12 +273,12 @@ blur (GimpDrawable *drawable)
             }
 
        }
-      if (i == 0){
+      /* if (i == 0){ */
 	
-	outrow[0] = 0;
-	outrow[1] = 0;
-	outrow[2] = 0;
-      }
+      /* 	outrow[0] = 0; */
+      /* 	outrow[1] = 0; */
+      /* 	outrow[2] = 0; */
+      /* } */
       
       // outrow[0] = 0;
       // outrow = row;
