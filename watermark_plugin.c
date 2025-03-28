@@ -49,10 +49,10 @@ void gimp_pixel_rgn_set_rect (GimpPixelRgn *pr,
 			      gint width,
 			      gint height);
 
-static void blur (GimpDrawable *drawable);
+static void watermark (GimpDrawable *drawable, guchar *pixels_to_change);
 
 static gboolean
-blur_dialog (GimpDrawable *drawable);
+watermark_dialog (GimpDrawable *drawable);
 
 static void init_mem (guchar ***row,
 		      guchar **outrow,
@@ -73,13 +73,13 @@ static void shuffle (GimpPixelRgn *rgn_in,
 		     gint height,
 		     gint ypos);
 
-struct MyBlurVals {
+struct MyWatermarkVals {
   gint radius;
   gboolean preview;
 };
 
 /* Set up default values for options */
-static struct MyBlurVals bvals; /* radius */
+static struct MyWatermarkVals bvals; /* radius */
 // bvals.radius = 3;
 
 /* The radius is still a constant, we'll change that when the
@@ -131,18 +131,20 @@ run (const gchar      *name,
 	/*  Get the specified drawable  */
 	drawable = gimp_drawable_get (param[2].data.d_drawable);
 	
-	gimp_progress_init ("My Blur...");
+	gimp_progress_init ("My Watermark...");
 
-	/* Let's time blur
+	/* Let's time watermark
 	 *
 	 *   GTimer timer = g_timer_new time ();
 	 */
 
-	printf("Crash point just before blur.\n");	
+	printf("Crash point just before watermark.\n");
 
-	blur (drawable);
+	guchar *pixels_to_change;
 
-	/*   g_print ("blur() took %g seconds.\n", g_timer_elapsed (timer));
+	watermark (drawable, pixels_to_change);
+
+	/*   g_print ("watermark() took %g seconds.\n", g_timer_elapsed (timer));
 	 *   g_timer_destroy (timer);
 	 */
 
@@ -152,7 +154,7 @@ run (const gchar      *name,
 	
 	/*  Finally, set options in the core  */
 	if (run_mode == GIMP_RUN_INTERACTIVE)
-	  gimp_set_data ("plug-in-myblur", &bvals, sizeof (struct MyBlurVals));
+	  gimp_set_data ("plug-in-mywatermark", &bvals, sizeof (struct MyWatermarkVals));
 
 	return;
 }
@@ -196,7 +198,7 @@ query (void)
 }
 
 static void
-blur (GimpDrawable *drawable)
+watermark(GimpDrawable *drawable, guchar *pixels_to_change)
 {
   gint         i, j, k, channels;
   gint         x1, y1, x2, y2;
