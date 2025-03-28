@@ -140,7 +140,15 @@ run (const gchar      *name,
 
 	printf("Crash point just before watermark.\n");
 
+	gint x1, y1, x2, y2;
+	
+	gimp_drawable_mask_bounds (drawable->drawable_id,
+                             &x1, &y1,
+                             &x2, &y2);
+
 	guchar *pixels_to_change;
+	gint channels = gimp_drawable_bpp (drawable->drawable_id);
+	pixels_to_change = g_new(guchar, channels * (x2 - x1));
 
 	watermark (drawable, pixels_to_change);
 
@@ -266,12 +274,16 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change)
               /*       row3[channels * MIN ((j + 1 - x1), x2 - x1 - 1) + k];  */
               outrow[channels * (j - x1) + k] = row2[channels * (j - x1) + k];
               // outrow[0] = 0;
-              if (i % 2 == 1 && j % 2 == 1) {
-              outrow[channels * (j - x1) + k] = 0;
-		/* outrow[0] = 0; */
-		/* outrow[1] = 0; */
-		//outrow[2] = 0;
-	      }
+              /* if (i % 2 == 1 && j % 2 == 1) { */
+              /* outrow[channels * (j - x1) + k] = 0; */
+	      /* 	/\* outrow[0] = 0; *\/ */
+	      /* 	/\* outrow[1] = 0; *\/ */
+	      /* 	//outrow[2] = 0; */
+	      /* } */
+
+              /* if (pixels_to_change[i][j] == 1) { */
+	      /* 	outrow[channels * (j - x1) + k] = pixels_to_change[i][j][channels * (j - x1) + k]; */
+	      /* } */
             }
 
        }
@@ -284,6 +296,8 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change)
       
       // outrow[0] = 0;
       // outrow = row;
+
+      
        gimp_pixel_rgn_set_row (&rgn_out,
                                outrow,
                                x1, i,
