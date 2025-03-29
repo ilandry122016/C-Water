@@ -157,20 +157,6 @@ run (const gchar      *name,
   
 	for (gint i = y1; i < y2; i++)
 	  {
-	    /* Get row i-1, i, i+1 */
-	    /* gimp_pixel_rgn_get_row (&rgn_in, */
-	    /* 			    row1, */
-	    /* 			    x1, MAX (y1, i - 1), */
-	    /* 			    x2 - x1); */
-	    /* gimp_pixel_rgn_get_row (&rgn_in, */
-	    /* 			    row2, */
-	    /* 			    x1, i, */
-	    /* 			    x2 - x1); */
-	    /* gimp_pixel_rgn_get_row (&rgn_in, */
-	    /* 			    row3, */
-	    /* 			    x1, MIN (y2 - 1, i + 1), */
-	    /* 			    x2 - x1); */
-
 	    for (gint j = x1; j < x2; j++)
 	      {
 		// Set the value to 1 to change the pixel.
@@ -244,8 +230,7 @@ static void
 watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, gint lower_limit_y, gint upper_limit_x, gint upper_limit_y, gint channels)
 {
   gint         i, j, k;
-  //gint channels;
-  // gint         x1, y1, x2, y2;
+  
   gint x1 = lower_limit_x;
   gint y1 = lower_limit_y;
   gint x2 = upper_limit_x;
@@ -262,7 +247,6 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
     width = x2 - x1;
     height = y2 - y1;
     
-    //channels = gimp_drawable_bpp (drawable->drawable_id);
 
   gimp_pixel_rgn_init (&rgn_in,
                        drawable,
@@ -303,44 +287,14 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
            * pixels */
           for (k = 0; k < channels; k++)
             {
-              /* int sum = 0; */
-              /* sum = row1[channels * MAX ((j - 1 - x1), 0) + k]           + */
-              /*       row1[channels * (j - x1) + k]                        + */
-              /*       row1[channels * MIN ((j + 1 - x1), x2 - x1 - 1) + k] + */
-              /*       row2[channels * MAX ((j - 1 - x1), 0) + k]           + */
-              /*       row2[channels * (j - x1) + k]                        + */
-              /*       row2[channels * MIN ((j + 1 - x1), x2 - x1 - 1) + k] + */
-              /*       row3[channels * MAX ((j - 1 - x1), 0) + k]           + */
-              /*       row3[channels * (j - x1) + k]                        + */
-              /*       row3[channels * MIN ((j + 1 - x1), x2 - x1 - 1) + k];  */
-              outrow[channels * (j - x1) + k] = row2[channels * (j - x1) + k];
-              // outrow[/* 0] = 0; */
-              /* if (i % 2 == 1 && j % 2 == 1) { */
-              /* outrow[channels * (j - x1) + k] = 0; */
-	      /* 	/\* outrow[0] = 0; *\/ */
-	      /* 	/\* outrow[1] = 0; *\/ */
-	      /* 	//outrow[2] = 0; */
-	      /* }		 */
-
-              /* if (pixels_to_change[i][j] == 1) { */
-	      /* 	outrow[channels * (j - x1) + k] = pixels_to_change[i][j][channels * (j - x1) + k]; */
-	      /* } */
+	      outrow[channels * (j - x1) + k] = row2[channels * (j - x1) + k];
+              
               if (pixels_to_change[channels * (j - x1) * (i - y1) + k] == 1) {
 		outrow[channels * (j - x1) + k] = 0;
 	      }
             }
 
        }
-      /* if (i == 0){ */
-	
-      /* 	outrow[0] = 0; */
-      /* 	outrow[1] = 0; */
-      /* 	outrow[2] = 0; */
-      /* } */
-      
-      // outrow[0] = 0;
-      // outrow = row;
-
       
        gimp_pixel_rgn_set_row (&rgn_out,
                                outrow,
