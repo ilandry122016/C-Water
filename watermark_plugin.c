@@ -49,7 +49,7 @@ void gimp_pixel_rgn_set_rect (GimpPixelRgn *pr,
 			      gint width,
 			      gint height);
 
-static void watermark (GimpDrawable *drawable, guchar *pixels_to_change);
+static void watermark (GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, gint lower_limit_y, gint upper_limit_x, gint upper_limit_y, gint channels);
 
 static gboolean
 watermark_dialog (GimpDrawable *drawable);
@@ -150,7 +150,7 @@ run (const gchar      *name,
 	gint channels = gimp_drawable_bpp (drawable->drawable_id);
 	pixels_to_change = g_new(guchar, channels * (x2 - x1));
 
-	watermark (drawable, pixels_to_change);
+	watermark (drawable, pixels_to_change, x1, x2, y1, y2, channels);
 
 	/*   g_print ("watermark() took %g seconds.\n", g_timer_elapsed (timer));
 	 *   g_timer_destroy (timer);
@@ -206,7 +206,7 @@ query (void)
 }
 
 static void
-watermark(GimpDrawable *drawable, guchar *pixels_to_change)
+watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, gint lower_limit_y, gint upper_limit_x, gint upper_limit_y, gint channels)
 {
   gint         i, j, k, channels;
   gint         x1, y1, x2, y2;
