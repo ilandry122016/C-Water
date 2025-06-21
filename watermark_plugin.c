@@ -162,11 +162,11 @@ run (const gchar      *name,
 		// Set the value to 1 to change the pixel.
 		// Set the value to 0 to leave the pixel alone.
 		for (gint k = 0; k < channels; k++) {
-		  if (i % 2 == 1 && j % 2 == 1){     
-		    pixels_to_change[channels * (j - x1) * (i - y1) + k] = 1;
-                  } else {
-		    pixels_to_change[channels * (j - x1) * (i - y1) + k] = 0;
-		  }
+		  /* if (i % 2 == 1 && j % 2 == 1){      */
+		  /*   pixels_to_change[channels * (j - x1) * (i - y1) + k] = 1; */
+                  /* } else { */
+		  /*   pixels_to_change[channels * (j - x1) * (i - y1) + k] = 0; */
+		  /* } */
                 }
 		
             }
