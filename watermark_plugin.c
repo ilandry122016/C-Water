@@ -154,14 +154,28 @@ run (const gchar      *name,
 	guchar      *row1, *row2, *row3;
 	guchar      *outrow;
 	gint         width, height;
+
+	guchar *subblock_pixels;
   
 	for (gint i = y1; i < y2; i++)
 	  {
 	    for (gint j = x1; j < x2; j++)
 	      {
+		// Get 8x8 subblocks of pixels
 		// Set the value to 1 to change the pixel.
 		// Set the value to 0 to leave the pixel alone.
 		for (gint k = 0; k < channels; k++) {
+		  if (i % 8 == 0 & j % 8 == 0){
+		    for (gint i_subblock = i; i_subblock < i_subblock + 8; i_subblock++){
+		      for (gint j_subblock = j; j_subblock < j_subblock + 8; j_subblock++){
+			subblock_pixels[channels * (j - x1) * (i - y1) + k] = val_of_bit_image
+		      }
+		    }
+		  }
+		  if (i == 6 && j == 6){
+
+		    G-matrix_val_coord_6_6 = (1/4) * 1 * 1 * (coord 6,6) * cos((2 * 6 + 1) * 6 * pi() / 16) * cos((2 * 6 + 1) * 6 * pi() / 16)
+		  }
 		  /* if (i % 2 == 1 && j % 2 == 1){      */
 		  /*   pixels_to_change[channels * (j - x1) * (i - y1) + k] = 1; */
                   /* } else { */
@@ -237,10 +251,12 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
   gint y2 = upper_limit_y;
   
   GimpPixelRgn rgn_in, rgn_out;
-  guchar      *row1, *row2, *row3;
+  // guchar      *row1, *row2, *row3;
   guchar      *outrow;
   gint         width, height;
 
+  guchar* row_arr[8];
+  
   gimp_drawable_mask_bounds (drawable->drawable_id,
                              &x1, &y1,
                              &x2, &y2);
@@ -260,27 +276,57 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
                        TRUE, TRUE);
 
   /* Initialise enough memory for row1, row2, row3, outrow */
-  row1 = g_new (guchar, channels * (x2 - x1));
-  row2 = g_new (guchar, channels * (x2 - x1));
-  row3 = g_new (guchar, channels * (x2 - x1));
+  /* row1 = g_new (guchar, channels * (x2 - x1)); */
+  /* row2 = g_new (guchar, channels * (x2 - x1)); */
+  /* row3 = g_new (guchar, channels * (x2 - x1)); */
+  /* row4 = g_new (guchar, channels * (x2 - x1)); */
+  /* row5 = g_new (guchar, channels * (x2 - x1)); */
+  /* row6 = g_new (guchar, channels * (x2 - x1)); */
+  /* row7 = g_new (guchar, channels * (x2 - x1)); */
+  /* row8 = g_new (guchar, channels * (x2 - x1)); */
+  for (int i = 0; i < 8; ++i){
+    row_arr[i] = g_new(guchar, channels * (x2 - x1));
+  }
+
   outrow = g_new (guchar, channels * (x2 - x1));
 
-  for (i = y1; i < y2; i++)
+  for (i = y1; i < y2; i += 8)
     {
-      /* Get row i-1, i, i+1 */
+      /* Get row i through i+7 */
       gimp_pixel_rgn_get_row (&rgn_in,
-                              row1,
-                              x1, MAX (y1, i - 1),
-                              x2 - x1);
-      gimp_pixel_rgn_get_row (&rgn_in,
-                              row2,
+                              row_arr[0]
                               x1, i,
                               x2 - x1);
       gimp_pixel_rgn_get_row (&rgn_in,
-                              row3,
+                              row_arr[1],
                               x1, MIN (y2 - 1, i + 1),
                               x2 - x1);
+      gimp_pixel_rgn_get_row (&rgn_in,
+			      row_arr[2],
+                              x1, MIN (y2 - 1, i + 2),
+                              x2 - x1);
+      gimp_pixel_rgn_get_row (&rgn_in,
+			      row_arr[3],
+                              x1, MIN (y2 - 1, i + 3),
+                              x2 - x1);
+      gimp_pixel_rgn_get_row (&rgn_in,
+			      row_arr[4],
+                              x1, MIN (y2 - 1, i + 4),
+                              x2 - x1);
+      gimp_pixel_rgn_get_row (&rgn_in,
+			      row_arr[5],
+                              x1, MIN (y2 - 1, i + 5),
+                              x2 - x1);
+      gimp_pixel_rgn_get_row (&rgn_in,
+			      row_arr[6],
+                              x1, MIN (y2 - 1, i + 6),
+                              x2 - x1);
+      gimp_pixel_rgn_get_row (&rgn_in,
+                              row_arr[7],
+                              x1, MIN (y2 - 1, i + 7),
+                              x2 - x1);
 
+      // Create A DCT matrix for the rows.
       for (j = x1; j < x2; j++)
         {
           /* For each layer, compute the average of the nine
