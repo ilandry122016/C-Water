@@ -86,74 +86,6 @@ struct MyWatermarkVals {
   gboolean preview;
 };
 
-/* // Function to get cofactor of mat[p][q] in cof[][]. n is */
-/* // current dimension of mat[][] */
-/* void getCof(int mat[N][N], int cof[N][N], int p, int q, int n) { */
-/*     int i = 0, j = 0; */
-/*     for (int row = 0; row < n; row++) { */
-/*         for (int col = 0; col < n; col++) { */
-/*             if (row != p && col != q) { */
-/*                 cof[i][j++] = mat[row][col]; */
-/*                 if (j == n - 1) { */
-/*                     j = 0; */
-/*                     i++; */
-/*                 } */
-/*             } */
-/*         } */
-/*     } */
-/* } */
-
-/* // Recursive function for finding determinant of matrix mat of dimension n */
-/* int getDet(int mat[N][N], int n) { */
-/*     if (n == 1) return mat[0][0]; */
-/*     int det = 0; */
-    
-/*     int cof[N][N]; */
-/*     int sign = 1; */
-/*     for (int f = 0; f < n; f++) { */
-/*         getCof(mat, cof, 0, f, n); */
-/*         det += sign * mat[0][f] * getDet(cof, n - 1); */
-/*         sign = -sign; */
-/*     } */
-/*     return det; */
-/* } */
-
-/* // Function to get adjoint of mat in adj */
-/* void adjoint(int mat[N][N], double adj[N][N]) { */
-/*     if (N == 1) { */
-/*         adj[0][0] = 1; */
-/*         return; */
-/*     } */
-    
-/*     int sign = 1; */
-/*     int cof[N][N]; */
-/*     for (int i = 0; i < N; i++) { */
-/*         for (int j = 0; j < N; j++) { */
-/*             getCof(mat, cof, i, j, N); */
-/*             sign = ((i + j) % 2 == 0) ? 1 : -1; */
-/*             adj[j][i] = sign * getDet(cof, N - 1); */
-/*         } */
-/*     } */
-/* } */
-
-/* // Function to calculate and store inverse, returns 0 if matrix is singular */
-/* int inverse(int mat[N][N], double inv[N][N]) { */
-/*     int det = getDet(mat, N); */
-/*     if (det == 0) { */
-/*         printf("Singular matrix, can't find its inverse\n"); */
-/*         return 0; */
-/*     } */
-
-/*     double adj[N][N]; */
-/*     adjoint(mat, adj); */
-
-/*     for (int i = 0; i < N; i++) */
-/*         for (int j = 0; j < N; j++) */
-/*             inv[i][j] = adj[i][j] / det; */
-
-/*     return 1; */
-/* } */
-
 void multiplyMatrix(guchar** m1, guchar** m2)
 {
   double result[8][8];
@@ -255,34 +187,6 @@ MAIN()
 
   guchar *subblock_pixels;
   
-  /* for (gint i = y1; i < y2; i++) */
-  /*   { */
-  /*     for (gint j = x1; j < x2; j++) */
-  /* 	{ */
-  /* 	  // Get 8x8 subblocks of pixels */
-  /* 	  // Set the value to 1 to change the pixel. */
-  /* 	  // Set the value to 0 to leave the pixel alone. */
-  /* 	  for (gint k = 0; k < channels; k++) { */
-  /* 	    if (i % 8 == 0 & j % 8 == 0){ */
-  /* 	      for (gint i_subblock = i; i_subblock < i_subblock + 8; i_subblock++){ */
-  /* 		for (gint j_subblock = j; j_subblock < j_subblock + 8; j_subblock++){ */
-  /* 		  // subblock_pixels[channels * (j - x1) * (i - y1) + k] = val_of_bit_image */
-  /* 		} */
-  /* 	      } */
-  /* 	    } */
-  /* 	    if (i == 6 && j == 6){ */
-
-  /* 	      // G_matrix_val_coord_6_6 = (1/4) * 1 * 1 * (coord 6,6) * cos((2 * 6 + 1) * 6 * pi() / 16) * cos((2 * 6 + 1) * 6 * pi() / 16) */
-  /* 	    } */
-  /* 	    /\* if (i % 2 == 1 && j % 2 == 1){      *\/ */
-  /* 	    /\*   pixels_to_change[channels * (j - x1) * (i - y1) + k] = 1; *\/ */
-  /* 	    /\* } else { *\/ */
-  /* 	    /\*   pixels_to_change[channels * (j - x1) * (i - y1) + k] = 0; *\/ */
-  /* 	    /\* } *\/ */
-  /* 	  } */
-		
-  /* 	} */
-  /*   } */
   watermark (drawable, pixels_to_change, x1, x2, y1, y2, channels);
 
   /*   g_print ("watermark() took %g seconds.\n", g_timer_elapsed (timer));
@@ -357,10 +261,13 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 
   guchar* row_arr[8];
   double* G_matrix_val[8]; // The matrix fot the DCT (Discrete Cosine Transform)
+  double* G_prime_matrix_val[8];
   double* G_matrix_inverse_val[8];
   guchar* Q_matrix_val[8]; // The quantization matrix.
   // guchar* Q_inverse_matrix_val[8]; // The inverse of the quantization matrix
-  guchar* B_matrix_val[8]; // The quantized DCT coefficient matrix
+  int* B_matrix_val[8]; // The quantized DCT coefficient matrix
+
+  int offset = 128;
   
   gimp_drawable_mask_bounds (drawable->drawable_id,
                              &x1, &y1,
@@ -391,11 +298,14 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
   /* row8 = g_new (guchar, channels * (x2 - x1)); */
   for (int i = 0; i < 8; ++i){
     row_arr[i] = g_new(guchar, channels * (x2 - x1));
-    G_matrix_val[i] = g_new(guchar, channels * (x2 - x1));
-    G_matrix_inverse_val[i] = g_new(guchar, channels * (x2 - x1));
+    G_matrix_val[i] = g_new(double, channels * (x2 - x1));
+    G_prime_matrix_val[i] = g_new(double, channels * (x2 - x1));
+    G_matrix_inverse_val[i] = g_new(double, channels * (x2 - x1));
     Q_matrix_val[i] = g_new(guchar, channels * (x2 - x1));
-    B_matrix_val[i] = g_new(guchar, channels * (x2 - x1));
+    B_matrix_val[i] = g_new(int, channels * (x2 - x1));
   }
+
+  printf("Crash point after initializing the matrices.\n");
 
   outrow = g_new (guchar, channels * (x2 - x1));
 
@@ -470,6 +380,7 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
   for (i = y1; i < y2; i += 8)
     {
       /* Get row i through i+7 */
+      printf("Crash point when getting row i.\n");
       gimp_pixel_rgn_get_row (&rgn_in,
                               row_arr[0],
                               x1, i,
@@ -509,24 +420,46 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
       
 
       //Break up into 8x8 subblocks of pixels
+
       
-      for (j = x1; j < x2; j++){
-	if (j % 8 == 0){
+      //for (j = x1; j < x2; j++){
+	//if (j % 8 == 0){
 	  for (u = 0; u < 8; ++u){ // u is the coordinate for the row_arr
 	    for (v = 0; v <  8; ++v){
 	      G_matrix_val[u][v] = 0;
 		
 	      for (x = 0; x <= 7; ++x){
 		for (y = 0; y <= 7; ++y){
-		  G_matrix_val[u][v] = (1/4) * alpha(u) * alpha(v) * row_arr[x][y] * cos((2 * x + 1) * u * M_PI / 16) * cos((2 * y + 1) * v * M_PI / 16);
+		  G_matrix_val[u][v] += (1.0/4) * alpha(u) * alpha(v) * (row_arr[x][y] - offset)
+		    * cos((2 * x + 1) * u * M_PI / 16) * cos((2 * y + 1) * v * M_PI / 16);
+		  /* if (u == 0 && v == 0){ */
+		  /*   printf("%d %d %g %d %g %g \n", x, y, G_matrix_val[u][v], row_arr[x][y], alpha(u), alpha(v)); */
+		  /* } */
 		}
 	      }
 	    }
 	  }
+	  //	}
+  //}
+
+      printf("row_arr:\n");
+      for (j = 0; j < 8; ++j){
+	for (k = 0; k < 8; ++k){
+	  printf("%d\t", row_arr[j][k]);
 	}
+
+	printf("\n");
       }
 
-      
+      printf("G_matrix_val:\n");
+      for (j = 0; j < 8; ++j){
+	for (k = 0; k < 8; ++k){
+	  printf("%g\t", G_matrix_val[j][k]);
+	}
+
+	printf("\n");
+      }
+
       // Compute the quantized DCT coefficient matrix
       for (j = 0; i < 8; ++i){
 	for (k = 0; j < 8; ++j){
@@ -534,32 +467,70 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 	}
       }
 
+      printf("B_matrix_val:\n");
+      for (j = 0; j < 8; ++j){
+	for (k = 0; k < 8; ++k){
+	  printf("%d\t", B_matrix_val[j][k]);
+	}
+
+	printf("\n");
+      }
+      
       // Apply the paper to encode the watermark.
-      // Compute the hash, and then encode it into the watermark.
+      // Compute the hash, and then encode it into the watermark (modify the matrix B).
       // Can use a fixed number as a hash. e.g. 1, 2, 3, 4, 5, 6, 7, 8, 9, ...
       // Encode it into the 6,6 component of the DCT.
-      // Reverse the DCT to get new values. Then you're done. (Multiply the DCT by it's inverse).
+      // Multiply the modified B element by element with Q (not regular multiply), and put the result in G'.
+
+      for (j = 0; j < 8; ++j){
+	for (k = 0; k < 8; ++k){
+	  G_prime_matrix_val[j][k] = B_matrix_val[j][k] * Q_matrix_val[j][k];
+	}
+      }
+
+      printf("G_prime_matrix_val:\n");
+      for (j = 0; j < 8; ++j){
+	for (k = 0; k < 8; ++k){
+	  printf("%g\t", G_prime_matrix_val[j][k]);
+	}
+
+	printf("\n");
+      }
+      
+      // Reverse the DCT on the new G' to get new values. Then you're done. (Multiply G' by the inverse of the DCT).
       
       // Compute the inverse matrix
 
       for (u = 0; u < 8; u++){
 	for (v = 0; v < 8; v++){
-	  G_matrix_inverse_val[u][v] = (1.0/4) * alpha(0) * alpha(0) * row_arr[0][0];
+	  G_matrix_inverse_val[u][v] = (1.0/4) * alpha(0) * alpha(0) * G_prime_matrix_val[0][0];
 
 	  for (x = 1; x < 8; x++){
 	    for (y = 1; y < 8; ++y){
-	      G_matrix_inverse_val[u][v] += (1.0/4) * alpha(u) * alpha(v) * row_arr[x][y] * cos((M_PI / 8) * (u + (1/2)) * x) * cos((M_PI / 8) * (v + (1/2)) * y);
+	      G_matrix_inverse_val[u][v] += (1.0/4) * alpha(u) * alpha(v) * G_prime_matrix_val[x][y] * cos((M_PI / 8) * (u + (1/2)) * x) * cos((M_PI / 8) * (v + (1/2)) * y);
 	    }
 	  }
 	}
       }
 
       gint hash = 1;
-      G_matrix_val[6][6] = hash;
+      //G_matrix_val[6][6] = hash;
+
+      
+      /* printf("G_matrix_inverse_val:\n"); */
+      /* for (j = 0; j < 8; ++j){ */
+      /* 	for (k = 0; k < 8; ++k){ */
+      /* 	  printf("%d\t", G_matrix_inverse_val[j][k]); */
+      /* 	} */
+
+      /* 	printf("\n"); */
+      /* } */
+      
+      printf("Crash point after G_matrix_val\n");
 
       // inverse(Q_matrix_val[j][k], Q_inverse_matrix_val[j][k]);
 
-      multiplyMatrix(G_matrix_val, G_matrix_inverse_val);
+      // multiplyMatrix(G_prime_matrix_val, G_matrix_inverse_val);
       
       // DCT_Coeff_matrix
       
