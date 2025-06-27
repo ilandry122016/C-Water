@@ -263,7 +263,7 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
   double* G_matrix_val[8]; // The matrix fot the DCT (Discrete Cosine Transform)
   double* G_prime_matrix_val[8];
   double* G_matrix_inverse_val[8];
-  guchar* Q_matrix_val[8]; // The quantization matrix.
+  guchar Q_matrix_val[8][8]; // The quantization matrix.
   // guchar* Q_inverse_matrix_val[8]; // The inverse of the quantization matrix
   int* B_matrix_val[8]; // The quantized DCT coefficient matrix
 
@@ -301,7 +301,6 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
     G_matrix_val[i] = g_new(double, channels * (x2 - x1));
     G_prime_matrix_val[i] = g_new(double, channels * (x2 - x1));
     G_matrix_inverse_val[i] = g_new(double, channels * (x2 - x1));
-    Q_matrix_val[i] = g_new(guchar, channels * (x2 - x1));
     B_matrix_val[i] = g_new(int, channels * (x2 - x1));
   }
 
@@ -461,8 +460,8 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
       }
 
       // Compute the quantized DCT coefficient matrix
-      for (j = 0; i < 8; ++i){
-	for (k = 0; j < 8; ++j){
+      for (j = 0; j < 8; ++j){
+	for (k = 0; k < 8; ++k){
 	  B_matrix_val[j][k] = round(G_matrix_val[j][k]/Q_matrix_val[j][k]);
 	}
       }
@@ -471,6 +470,15 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
       for (j = 0; j < 8; ++j){
 	for (k = 0; k < 8; ++k){
 	  printf("%d\t", B_matrix_val[j][k]);
+	}
+
+	printf("\n");
+      }
+
+      printf("Q_matrix_val:\n");
+      for (j = 0; j < 8; ++j){
+	for (k = 0; k < 8; ++k){
+	  printf("%d\t", Q_matrix_val[j][k]);
 	}
 
 	printf("\n");
@@ -529,7 +537,7 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 	      /* G_matrix_inverse_val[u][v] += (1.0/4) * alpha(u) * alpha(v) * G_prime_matrix_val[x][y] */
 	      /* 	* cos((M_PI / 8) * (u + (1.0/2)) * x) * cos((M_PI / 8) * (v + (1.0/2)) * y); */
 
-	      G_matrix_inverse_val[x][y] += (1.0/4) * alpha(u) * alpha(v) * G_matrix_val[u][v]
+	      G_matrix_inverse_val[x][y] += (1.0/4) * alpha(u) * alpha(v) * G_prime_matrix_val[u][v]
 		* cos((M_PI / 8) * (x + (1.0/2)) * u) * cos((M_PI / 8) * (y + (1.0/2)) * v);
 	      /* if (u == 0 && v == 0){ */
 	      /* 	printf("%d %d %g \n", x, y, G_matrix_inverse_val[u][v]); */
