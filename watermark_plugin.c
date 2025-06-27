@@ -501,13 +501,39 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
       
       // Compute the inverse matrix
 
-      for (u = 0; u < 8; u++){
-	for (v = 0; v < 8; v++){
-	  G_matrix_inverse_val[u][v] = (1.0/4) * alpha(0) * alpha(0) * G_prime_matrix_val[0][0];
+      /* for (u = 0; u < 8; u++){ */
+      /* 	for (v = 0; v < 8; v++){ */
+      /* 	  G_matrix_inverse_val[u][v] = 0; */
 
-	  for (x = 1; x < 8; x++){
-	    for (y = 1; y < 8; ++y){
-	      G_matrix_inverse_val[u][v] += (1.0/4) * alpha(u) * alpha(v) * G_prime_matrix_val[x][y] * cos((M_PI / 8) * (u + (1/2)) * x) * cos((M_PI / 8) * (v + (1/2)) * y);
+      /* 	  for (x = 0; x < 8; x++){ */
+      /* 	    for (y = 0; y < 8; ++y){ */
+      /* 	      /\* G_matrix_inverse_val[u][v] += (1.0/4) * alpha(u) * alpha(v) * G_prime_matrix_val[x][y] *\/ */
+      /* 	      /\* 	* cos((M_PI / 8) * (u + (1.0/2)) * x) * cos((M_PI / 8) * (v + (1.0/2)) * y); *\/ */
+
+      /* 	      G_matrix_inverse_val[u][v] += (1.0/4) * alpha(u) * alpha(v) * G_matrix_val[x][y] */
+      /* 		* cos((M_PI / 8) * (u + (1.0/2)) * x) * cos((M_PI / 8) * (v + (1.0/2)) * y); */
+      /* 	      /\* if (u == 0 && v == 0){ *\/ */
+      /* 	      /\* 	printf("%d %d %g \n", x, y, G_matrix_inverse_val[u][v]); *\/ */
+      /* 	      /\* } *\/ */
+      /* 	    } */
+      /* 	  } */
+      /* 	} */
+      /* } */
+
+      for (x = 0; x < 8; x++){
+	for (y = 0; y < 8; y++){
+	  G_matrix_inverse_val[x][y] = 0;
+
+	  for (u = 0; u < 8; u++){
+	    for (v = 0; v < 8; ++v){
+	      /* G_matrix_inverse_val[u][v] += (1.0/4) * alpha(u) * alpha(v) * G_prime_matrix_val[x][y] */
+	      /* 	* cos((M_PI / 8) * (u + (1.0/2)) * x) * cos((M_PI / 8) * (v + (1.0/2)) * y); */
+
+	      G_matrix_inverse_val[x][y] += (1.0/4) * alpha(u) * alpha(v) * G_matrix_val[u][v]
+		* cos((M_PI / 8) * (x + (1.0/2)) * u) * cos((M_PI / 8) * (y + (1.0/2)) * v);
+	      /* if (u == 0 && v == 0){ */
+	      /* 	printf("%d %d %g \n", x, y, G_matrix_inverse_val[u][v]); */
+	      /* } */
 	    }
 	  }
 	}
@@ -517,14 +543,14 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
       //G_matrix_val[6][6] = hash;
 
       
-      /* printf("G_matrix_inverse_val:\n"); */
-      /* for (j = 0; j < 8; ++j){ */
-      /* 	for (k = 0; k < 8; ++k){ */
-      /* 	  printf("%d\t", G_matrix_inverse_val[j][k]); */
-      /* 	} */
+      printf("G_matrix_inverse_val:\n");
+      for (j = 0; j < 8; ++j){
+	for (k = 0; k < 8; ++k){
+	  printf("%g\t", G_matrix_inverse_val[j][k] + offset);
+	}
 
-      /* 	printf("\n"); */
-      /* } */
+	printf("\n");
+      }
       
       printf("Crash point after G_matrix_val\n");
 
