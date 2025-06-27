@@ -154,25 +154,25 @@ struct MyWatermarkVals {
 /*     return 1; */
 /* } */
 
-void multiplyMatrix(int m1[][8], int m2[][8])
+void multiplyMatrix(guchar** m1, guchar** m2)
 {
-    int result[8][8];
+  double result[8][8];
 
-    printf("Resultant Matrix is:\n");
+  printf("Resultant Matrix is:\n");
 
-    for (int i = 0; i < 8; i++) {
-        for (int j = 0; j < 8; j++) {
-            result[i][j] = 0;
+  for (int i = 0; i < 8; i++) {
+    for (int j = 0; j < 8; j++) {
+      result[i][j] = 0;
 
-            for (int k = 0; k < 8; k++) {
-                result[i][j] += m1[i][k] * m2[k][j];
-            }
+      for (int k = 0; k < 8; k++) {
+	result[i][j] += m1[i][k] * m2[k][j];
+      }
 
-            printf("%d\t", result[i][j]);
-        }
-
-        printf("\n");
+      printf("%d\t", result[i][j]);
     }
+
+    printf("\n");
+  }
 }
 
 
@@ -255,34 +255,34 @@ MAIN()
 
   guchar *subblock_pixels;
   
-  for (gint i = y1; i < y2; i++)
-    {
-      for (gint j = x1; j < x2; j++)
-	{
-	  // Get 8x8 subblocks of pixels
-	  // Set the value to 1 to change the pixel.
-	  // Set the value to 0 to leave the pixel alone.
-	  for (gint k = 0; k < channels; k++) {
-	    if (i % 8 == 0 & j % 8 == 0){
-	      for (gint i_subblock = i; i_subblock < i_subblock + 8; i_subblock++){
-		for (gint j_subblock = j; j_subblock < j_subblock + 8; j_subblock++){
-		  // subblock_pixels[channels * (j - x1) * (i - y1) + k] = val_of_bit_image
-		}
-	      }
-	    }
-	    if (i == 6 && j == 6){
+  /* for (gint i = y1; i < y2; i++) */
+  /*   { */
+  /*     for (gint j = x1; j < x2; j++) */
+  /* 	{ */
+  /* 	  // Get 8x8 subblocks of pixels */
+  /* 	  // Set the value to 1 to change the pixel. */
+  /* 	  // Set the value to 0 to leave the pixel alone. */
+  /* 	  for (gint k = 0; k < channels; k++) { */
+  /* 	    if (i % 8 == 0 & j % 8 == 0){ */
+  /* 	      for (gint i_subblock = i; i_subblock < i_subblock + 8; i_subblock++){ */
+  /* 		for (gint j_subblock = j; j_subblock < j_subblock + 8; j_subblock++){ */
+  /* 		  // subblock_pixels[channels * (j - x1) * (i - y1) + k] = val_of_bit_image */
+  /* 		} */
+  /* 	      } */
+  /* 	    } */
+  /* 	    if (i == 6 && j == 6){ */
 
-	      // G_matrix_val_coord_6_6 = (1/4) * 1 * 1 * (coord 6,6) * cos((2 * 6 + 1) * 6 * pi() / 16) * cos((2 * 6 + 1) * 6 * pi() / 16)
-		}
-	    /* if (i % 2 == 1 && j % 2 == 1){      */
-	    /*   pixels_to_change[channels * (j - x1) * (i - y1) + k] = 1; */
-	    /* } else { */
-	    /*   pixels_to_change[channels * (j - x1) * (i - y1) + k] = 0; */
-	    /* } */
-	  }
+  /* 	      // G_matrix_val_coord_6_6 = (1/4) * 1 * 1 * (coord 6,6) * cos((2 * 6 + 1) * 6 * pi() / 16) * cos((2 * 6 + 1) * 6 * pi() / 16) */
+  /* 	    } */
+  /* 	    /\* if (i % 2 == 1 && j % 2 == 1){      *\/ */
+  /* 	    /\*   pixels_to_change[channels * (j - x1) * (i - y1) + k] = 1; *\/ */
+  /* 	    /\* } else { *\/ */
+  /* 	    /\*   pixels_to_change[channels * (j - x1) * (i - y1) + k] = 0; *\/ */
+  /* 	    /\* } *\/ */
+  /* 	  } */
 		
-	}
-    }
+  /* 	} */
+  /*   } */
   watermark (drawable, pixels_to_change, x1, x2, y1, y2, channels);
 
   /*   g_print ("watermark() took %g seconds.\n", g_timer_elapsed (timer));
@@ -356,8 +356,8 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
   gint u, v, x, y;
 
   guchar* row_arr[8];
-  guchar* G_matrix_val[8]; // The matrix fot the DCT (Discrete Cosine Transform)
-  guchar* G_matrix_inverse_val[8];
+  double* G_matrix_val[8]; // The matrix fot the DCT (Discrete Cosine Transform)
+  double* G_matrix_inverse_val[8];
   guchar* Q_matrix_val[8]; // The quantization matrix.
   // guchar* Q_inverse_matrix_val[8]; // The inverse of the quantization matrix
   guchar* B_matrix_val[8]; // The quantized DCT coefficient matrix
@@ -398,6 +398,74 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
   }
 
   outrow = g_new (guchar, channels * (x2 - x1));
+
+  // Create a quantization matrix
+
+  Q_matrix_val[0][0] = 16;
+  Q_matrix_val[0][1] = 11;
+  Q_matrix_val[0][2] = 10;
+  Q_matrix_val[0][3] = 16;
+  Q_matrix_val[0][4] = 24;
+  Q_matrix_val[0][5] = 40;
+  Q_matrix_val[0][6] = 51;
+  Q_matrix_val[0][7] = 61;
+  Q_matrix_val[1][0] = 12;
+  Q_matrix_val[1][1] = 12;
+  Q_matrix_val[1][2] = 14;
+  Q_matrix_val[1][3] = 19;
+  Q_matrix_val[1][4] = 26;
+  Q_matrix_val[1][5] = 58;
+  Q_matrix_val[1][6] = 60;
+  Q_matrix_val[1][7] = 55;
+  Q_matrix_val[2][0] = 14;
+  Q_matrix_val[2][1] = 13;
+  Q_matrix_val[2][2] = 16;
+  Q_matrix_val[2][3] = 24;
+  Q_matrix_val[2][4] = 40;
+  Q_matrix_val[2][5] = 57;
+  Q_matrix_val[2][6] = 69;
+  Q_matrix_val[2][7] = 56;
+  Q_matrix_val[3][0] = 14;
+  Q_matrix_val[3][1] = 17;
+  Q_matrix_val[3][2] = 22;
+  Q_matrix_val[3][3] = 29;
+  Q_matrix_val[3][4] = 51;
+  Q_matrix_val[3][5] = 87;
+  Q_matrix_val[3][6] = 80;
+  Q_matrix_val[3][7] = 62;
+  Q_matrix_val[4][0] = 18;
+  Q_matrix_val[4][1] = 22;
+  Q_matrix_val[4][2] = 37;
+  Q_matrix_val[4][3] = 56;
+  Q_matrix_val[4][4] = 68;
+  Q_matrix_val[4][5] = 109;
+  Q_matrix_val[4][6] = 103;
+  Q_matrix_val[4][7] = 77;
+  Q_matrix_val[5][0] = 24;
+  Q_matrix_val[5][1] = 25;
+  Q_matrix_val[5][2] = 55;
+  Q_matrix_val[5][3] = 64;
+  Q_matrix_val[5][4] = 81;
+  Q_matrix_val[5][5] = 104;
+  Q_matrix_val[5][6] = 113;
+  Q_matrix_val[5][7] = 92;
+  Q_matrix_val[6][0] = 49;
+  Q_matrix_val[6][1] = 64;
+  Q_matrix_val[6][2] = 78;
+  Q_matrix_val[6][3] = 87;
+  Q_matrix_val[6][4] = 103;
+  Q_matrix_val[6][5] = 121;
+  Q_matrix_val[6][6] = 120;
+  Q_matrix_val[6][7] = 101;
+  Q_matrix_val[7][0] = 72;
+  Q_matrix_val[7][1] = 92;
+  Q_matrix_val[7][2] = 95;
+  Q_matrix_val[7][3] = 98;
+  Q_matrix_val[7][4] = 112;
+  Q_matrix_val[7][5] = 100;
+  Q_matrix_val[7][6] = 103;
+  Q_matrix_val[7][7] = 99;
+
 
   for (i = y1; i < y2; i += 8)
     {
@@ -458,73 +526,7 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 	}
       }
 
-      // Create a quantization matrix
-
-      Q_matrix_val[0][0] = 16;
-      Q_matrix_val[0][1] = 11;
-      Q_matrix_val[0][2] = 10;
-      Q_matrix_val[0][3] = 16;
-      Q_matrix_val[0][4] = 24;
-      Q_matrix_val[0][5] = 40;
-      Q_matrix_val[0][6] = 51;
-      Q_matrix_val[0][7] = 61;
-      Q_matrix_val[1][0] = 12;
-      Q_matrix_val[1][1] = 12;
-      Q_matrix_val[1][2] = 14;
-      Q_matrix_val[1][3] = 19;
-      Q_matrix_val[1][4] = 26;
-      Q_matrix_val[1][5] = 58;
-      Q_matrix_val[1][6] = 60;
-      Q_matrix_val[1][7] = 55;
-      Q_matrix_val[2][0] = 14;
-      Q_matrix_val[2][1] = 13;
-      Q_matrix_val[2][2] = 16;
-      Q_matrix_val[2][3] = 24;
-      Q_matrix_val[2][4] = 40;
-      Q_matrix_val[2][5] = 57;
-      Q_matrix_val[2][6] = 69;
-      Q_matrix_val[2][7] = 56;
-      Q_matrix_val[3][0] = 14;
-      Q_matrix_val[3][1] = 17;
-      Q_matrix_val[3][2] = 22;
-      Q_matrix_val[3][3] = 29;
-      Q_matrix_val[3][4] = 51;
-      Q_matrix_val[3][5] = 87;
-      Q_matrix_val[3][6] = 80;
-      Q_matrix_val[3][7] = 62;
-      Q_matrix_val[4][0] = 18;
-      Q_matrix_val[4][1] = 22;
-      Q_matrix_val[4][2] = 37;
-      Q_matrix_val[4][3] = 56;
-      Q_matrix_val[4][4] = 68;
-      Q_matrix_val[4][5] = 109;
-      Q_matrix_val[4][6] = 103;
-      Q_matrix_val[4][7] = 77;
-      Q_matrix_val[5][0] = 24;
-      Q_matrix_val[5][1] = 25;
-      Q_matrix_val[5][2] = 55;
-      Q_matrix_val[5][3] = 64;
-      Q_matrix_val[5][4] = 81;
-      Q_matrix_val[5][5] = 104;
-      Q_matrix_val[5][6] = 113;
-      Q_matrix_val[5][7] = 92;
-      Q_matrix_val[6][0] = 49;
-      Q_matrix_val[6][1] = 64;
-      Q_matrix_val[6][2] = 78;
-      Q_matrix_val[6][3] = 87;
-      Q_matrix_val[6][4] = 103;
-      Q_matrix_val[6][5] = 121;
-      Q_matrix_val[6][6] = 120;
-      Q_matrix_val[6][7] = 101;
-      Q_matrix_val[7][0] = 72;
-      Q_matrix_val[7][1] = 92;
-      Q_matrix_val[7][2] = 95;
-      Q_matrix_val[7][3] = 98;
-      Q_matrix_val[7][4] = 112;
-      Q_matrix_val[7][5] = 100;
-      Q_matrix_val[7][6] = 103;
-      Q_matrix_val[7][7] = 99;
-
+      
       // Compute the quantized DCT coefficient matrix
       for (j = 0; i < 8; ++i){
 	for (k = 0; j < 8; ++j){
@@ -547,9 +549,9 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 	  for (x = 1; x < 8; x++){
 	    for (y = 1; y < 8; ++y){
 	      G_matrix_inverse_val[u][v] += (1.0/4) * alpha(u) * alpha(v) * row_arr[x][y] * cos((M_PI / 8) * (u + (1/2)) * x) * cos((M_PI / 8) * (v + (1/2)) * y);
+	    }
 	  }
 	}
-      }
       }
 
       gint hash = 1;
@@ -557,20 +559,20 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 
       // inverse(Q_matrix_val[j][k], Q_inverse_matrix_val[j][k]);
 
-      multiplyMatrix(G_matrix_val[j][k], G_matrix_inverse_val[j][k]);
+      multiplyMatrix(G_matrix_val, G_matrix_inverse_val);
       
       // DCT_Coeff_matrix
       
       /* For each layer, compute the average of the nine
        * pixels */
-      for (k = 0; k < channels; k++)
-	{
-	  // outrow[channels * (j - x1) + k] = row2[channels * (j - x1) + k];
+      /* for (k = 0; k < channels; k++) */
+      /* 	{ */
+      /* 	  // outrow[channels * (j - x1) + k] = row2[channels * (j - x1) + k]; */
               
-	  if (pixels_to_change[channels * (j - x1) * (i - y1) + k] == 1) {
-	    outrow[channels * (j - x1) + k] = 0;
-	  }
-	}
+      /* 	  if (pixels_to_change[channels * (j - x1) * (i - y1) + k] == 1) { */
+      /* 	    outrow[channels * (j - x1) + k] = 0; */
+      /* 	  } */
+      /* 	} */
       
       gimp_pixel_rgn_set_row (&rgn_out,
 			      outrow,
