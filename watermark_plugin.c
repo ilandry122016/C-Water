@@ -416,7 +416,7 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 
       for (k = 0; k < 8; ++k){
 	for (j = 0; j < 8; ++j){
-	  outrow[k][j + col_offset] = row_arr[k][j + col_offset];
+	  outrow[k][j + col_offset] = G_matrix_inverse_val[j][k] + offset;
 	}
       }
 	
