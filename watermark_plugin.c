@@ -263,10 +263,6 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
   double* G_matrix_val[8]; // The matrix fot the DCT (Discrete Cosine Transform)
   double* G_prime_matrix_val[8];
   double* G_matrix_inverse_val[8];
-  guchar Q_matrix_val[8][8]; // The quantization matrix.
-  // guchar* Q_inverse_matrix_val[8]; // The inverse of the quantization matrix
-  int* B_matrix_val[8]; // The quantized DCT coefficient matrix
-
   int offset = 128;
   
   gimp_drawable_mask_bounds (drawable->drawable_id,
@@ -287,94 +283,16 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
                        x2 - x1, y2 - y1,
                        TRUE, TRUE);
 
-  /* Initialise enough memory for row1, row2, row3, outrow */
-  /* row1 = g_new (guchar, channels * (x2 - x1)); */
-  /* row2 = g_new (guchar, channels * (x2 - x1)); */
-  /* row3 = g_new (guchar, channels * (x2 - x1)); */
-  /* row4 = g_new (guchar, channels * (x2 - x1)); */
-  /* row5 = g_new (guchar, channels * (x2 - x1)); */
-  /* row6 = g_new (guchar, channels * (x2 - x1)); */
-  /* row7 = g_new (guchar, channels * (x2 - x1)); */
-  /* row8 = g_new (guchar, channels * (x2 - x1)); */
   for (int i = 0; i < 8; ++i){
     row_arr[i] = g_new(guchar, channels * (x2 - x1));
     G_matrix_val[i] = g_new(double, channels * (x2 - x1));
     G_prime_matrix_val[i] = g_new(double, channels * (x2 - x1));
     G_matrix_inverse_val[i] = g_new(double, channels * (x2 - x1));
-    B_matrix_val[i] = g_new(int, channels * (x2 - x1));
   }
 
   printf("Crash point after initializing the matrices.\n");
 
   outrow = g_new (guchar, channels * (x2 - x1));
-
-  // Create a quantization matrix
-
-  Q_matrix_val[0][0] = 16;
-  Q_matrix_val[0][1] = 11;
-  Q_matrix_val[0][2] = 10;
-  Q_matrix_val[0][3] = 16;
-  Q_matrix_val[0][4] = 24;
-  Q_matrix_val[0][5] = 40;
-  Q_matrix_val[0][6] = 51;
-  Q_matrix_val[0][7] = 61;
-  Q_matrix_val[1][0] = 12;
-  Q_matrix_val[1][1] = 12;
-  Q_matrix_val[1][2] = 14;
-  Q_matrix_val[1][3] = 19;
-  Q_matrix_val[1][4] = 26;
-  Q_matrix_val[1][5] = 58;
-  Q_matrix_val[1][6] = 60;
-  Q_matrix_val[1][7] = 55;
-  Q_matrix_val[2][0] = 14;
-  Q_matrix_val[2][1] = 13;
-  Q_matrix_val[2][2] = 16;
-  Q_matrix_val[2][3] = 24;
-  Q_matrix_val[2][4] = 40;
-  Q_matrix_val[2][5] = 57;
-  Q_matrix_val[2][6] = 69;
-  Q_matrix_val[2][7] = 56;
-  Q_matrix_val[3][0] = 14;
-  Q_matrix_val[3][1] = 17;
-  Q_matrix_val[3][2] = 22;
-  Q_matrix_val[3][3] = 29;
-  Q_matrix_val[3][4] = 51;
-  Q_matrix_val[3][5] = 87;
-  Q_matrix_val[3][6] = 80;
-  Q_matrix_val[3][7] = 62;
-  Q_matrix_val[4][0] = 18;
-  Q_matrix_val[4][1] = 22;
-  Q_matrix_val[4][2] = 37;
-  Q_matrix_val[4][3] = 56;
-  Q_matrix_val[4][4] = 68;
-  Q_matrix_val[4][5] = 109;
-  Q_matrix_val[4][6] = 103;
-  Q_matrix_val[4][7] = 77;
-  Q_matrix_val[5][0] = 24;
-  Q_matrix_val[5][1] = 25;
-  Q_matrix_val[5][2] = 55;
-  Q_matrix_val[5][3] = 64;
-  Q_matrix_val[5][4] = 81;
-  Q_matrix_val[5][5] = 104;
-  Q_matrix_val[5][6] = 113;
-  Q_matrix_val[5][7] = 92;
-  Q_matrix_val[6][0] = 49;
-  Q_matrix_val[6][1] = 64;
-  Q_matrix_val[6][2] = 78;
-  Q_matrix_val[6][3] = 87;
-  Q_matrix_val[6][4] = 103;
-  Q_matrix_val[6][5] = 121;
-  Q_matrix_val[6][6] = 120;
-  Q_matrix_val[6][7] = 101;
-  Q_matrix_val[7][0] = 72;
-  Q_matrix_val[7][1] = 92;
-  Q_matrix_val[7][2] = 95;
-  Q_matrix_val[7][3] = 98;
-  Q_matrix_val[7][4] = 112;
-  Q_matrix_val[7][5] = 100;
-  Q_matrix_val[7][6] = 103;
-  Q_matrix_val[7][7] = 99;
-
 
   for (i = y1; i < y2; i += 8)
     {
@@ -414,7 +332,6 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
                               x2 - x1);
 
       // Create A DCT matrix for the rows.
-      // G_matrix_val_coord_6_6 = (1/4) * 1 * 1 * (coord 6,6) * cos((2 * 6 + 1) * 6 * pi() / 16) * cos((2 * 6 + 1) * 6 * pi() / 16)
 
       
 
@@ -458,31 +375,6 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 
 	printf("\n");
       }
-
-      // Compute the quantized DCT coefficient matrix
-      for (j = 0; j < 8; ++j){
-	for (k = 0; k < 8; ++k){
-	  B_matrix_val[j][k] = round(G_matrix_val[j][k]/Q_matrix_val[j][k]);
-	}
-      }
-
-      printf("B_matrix_val:\n");
-      for (j = 0; j < 8; ++j){
-	for (k = 0; k < 8; ++k){
-	  printf("%d\t", B_matrix_val[j][k]);
-	}
-
-	printf("\n");
-      }
-
-      printf("Q_matrix_val:\n");
-      for (j = 0; j < 8; ++j){
-	for (k = 0; k < 8; ++k){
-	  printf("%d\t", Q_matrix_val[j][k]);
-	}
-
-	printf("\n");
-      }
       
       // Apply the paper to encode the watermark.
       // Compute the hash, and then encode it into the watermark (modify the matrix B).
@@ -492,7 +384,7 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 
       for (j = 0; j < 8; ++j){
 	for (k = 0; k < 8; ++k){
-	  G_prime_matrix_val[j][k] = B_matrix_val[j][k] * Q_matrix_val[j][k];
+	  G_prime_matrix_val[j][k] = G_matrix_val[j][k];
 	}
       }
 
@@ -506,27 +398,6 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
       }
       
       // Reverse the DCT on the new G' to get new values. Then you're done. (Multiply G' by the inverse of the DCT).
-      
-      // Compute the inverse matrix
-
-      /* for (u = 0; u < 8; u++){ */
-      /* 	for (v = 0; v < 8; v++){ */
-      /* 	  G_matrix_inverse_val[u][v] = 0; */
-
-      /* 	  for (x = 0; x < 8; x++){ */
-      /* 	    for (y = 0; y < 8; ++y){ */
-      /* 	      /\* G_matrix_inverse_val[u][v] += (1.0/4) * alpha(u) * alpha(v) * G_prime_matrix_val[x][y] *\/ */
-      /* 	      /\* 	* cos((M_PI / 8) * (u + (1.0/2)) * x) * cos((M_PI / 8) * (v + (1.0/2)) * y); *\/ */
-
-      /* 	      G_matrix_inverse_val[u][v] += (1.0/4) * alpha(u) * alpha(v) * G_matrix_val[x][y] */
-      /* 		* cos((M_PI / 8) * (u + (1.0/2)) * x) * cos((M_PI / 8) * (v + (1.0/2)) * y); */
-      /* 	      /\* if (u == 0 && v == 0){ *\/ */
-      /* 	      /\* 	printf("%d %d %g \n", x, y, G_matrix_inverse_val[u][v]); *\/ */
-      /* 	      /\* } *\/ */
-      /* 	    } */
-      /* 	  } */
-      /* 	} */
-      /* } */
 
       for (x = 0; x < 8; x++){
 	for (y = 0; y < 8; y++){
@@ -534,14 +405,8 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 
 	  for (u = 0; u < 8; u++){
 	    for (v = 0; v < 8; ++v){
-	      /* G_matrix_inverse_val[u][v] += (1.0/4) * alpha(u) * alpha(v) * G_prime_matrix_val[x][y] */
-	      /* 	* cos((M_PI / 8) * (u + (1.0/2)) * x) * cos((M_PI / 8) * (v + (1.0/2)) * y); */
-
 	      G_matrix_inverse_val[x][y] += (1.0/4) * alpha(u) * alpha(v) * G_prime_matrix_val[u][v]
 		* cos((M_PI / 8) * (x + (1.0/2)) * u) * cos((M_PI / 8) * (y + (1.0/2)) * v);
-	      /* if (u == 0 && v == 0){ */
-	      /* 	printf("%d %d %g \n", x, y, G_matrix_inverse_val[u][v]); */
-	      /* } */
 	    }
 	  }
 	}
@@ -561,24 +426,6 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
       }
       
       printf("Crash point after G_matrix_val\n");
-
-      // inverse(Q_matrix_val[j][k], Q_inverse_matrix_val[j][k]);
-
-      // multiplyMatrix(G_prime_matrix_val, G_matrix_inverse_val);
-      
-      // DCT_Coeff_matrix
-      
-      /* For each layer, compute the average of the nine
-       * pixels */
-      /* for (k = 0; k < channels; k++) */
-      /* 	{ */
-      /* 	  // outrow[channels * (j - x1) + k] = row2[channels * (j - x1) + k]; */
-              
-      /* 	  if (pixels_to_change[channels * (j - x1) * (i - y1) + k] == 1) { */
-      /* 	    outrow[channels * (j - x1) + k] = 0; */
-      /* 	  } */
-      /* 	} */
-      
       gimp_pixel_rgn_set_row (&rgn_out,
 			      outrow,
 			      x1, i,
@@ -588,9 +435,6 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 	gimp_progress_update ((gdouble) (i - y1) / (gdouble) (y2 - y1));
     }
 
-  /* g_free (row1); */
-  /* g_free (row2); */
-  /* g_free (row3); */
   printf("Crash point before freeing the memory.\n");
   for (i = 0; i < 8; ++i){
     printf("Crash point when freeing row_arr.\n");
@@ -601,8 +445,6 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
     g_free(G_prime_matrix_val[i]);
     printf("Crash point when freeing G_matrix_inverse_val.\n");
     g_free(G_matrix_inverse_val[i]);
-    printf("Crash point when freeing B_matrix_val.\n");
-    g_free(B_matrix_val[i]);
   }
   g_free (outrow);
 
