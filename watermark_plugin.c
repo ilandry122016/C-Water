@@ -332,16 +332,14 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
       //Break up into 8x8 subblocks of pixels
 
       
-      //     for (gint col_offset = x1; col_offset < x2; col_offset += 8){
-      {
+      for (gint col_offset = x1; col_offset < x2; col_offset += 8){
 	  for (u = 0; u < 8; ++u){ // u is the coordinate for the row_arr
 	    for (v = 0; v <  8; ++v){
 	      G_matrix_val[u][v] = 0;
 		
 	      for (x = 0; x <= 7; ++x){
 		for (y = 0; y <= 7; ++y){
-		  //		  G_matrix_val[u][v] += (1.0/4) * alpha(u) * alpha(v) * (row_arr[col_offset + x][y] - offset)
-		    G_matrix_val[u][v] += (1.0/4) * alpha(u) * alpha(v) * (row_arr[x][y] - offset)
+		  G_matrix_val[u][v] += (1.0/4) * alpha(u) * alpha(v) * (row_arr[y][col_offset + x] - offset)
 		    * cos((2 * x + 1) * u * M_PI / 16) * cos((2 * y + 1) * v * M_PI / 16);
 		}
 	      }
