@@ -330,7 +330,7 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
       //Break up into 8x8 subblocks of pixels
 
       
-      for (gint col_offset = x1; col_offset < x2; col_offset += 8){
+      for (gint col_offset = 0; col_offset < channels * (x2 - x1); col_offset += 8){
 	  for (u = 0; u < 8; ++u){ // u is the coordinate for the row_arr
 	    for (v = 0; v <  8; ++v){
 	      G_matrix_val[u][v] = 0;
@@ -344,7 +344,7 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 	    }
 	  }
 	
-	  printf("G %d %d %d %g \n", i, col_offset, (int)(G_matrix_val[6][6]), G_matrix_val[6][6]);
+	  //printf("G %d %d %d %g \n", i, col_offset, (int)(G_matrix_val[6][6]), G_matrix_val[6][6]);
 	  
 
       /* printf("row_arr:\n"); */
@@ -413,15 +413,18 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 
      /* 	printf("\n"); */
      /*  } */
+
+      for (k = 0; k < 8; ++k){
+	for (j = 0; j < 8; ++j){
+	  outrow[k][j + col_offset] = row_arr[k][j + col_offset];
+	}
+      }
+	
+
       }      
      /*  printf("Crash point after G_matrix_val\n"); */
-      
       for (k = 0; k < 8; ++k){
-	for (j = 0; j < channels * (x2 - x1); ++j){
-	  outrow[k][j] = row_arr[k][j];
-	}
-      
-
+	
 	gimp_pixel_rgn_set_row (&rgn_out,
 				outrow[k],
 				x1, i + k,
