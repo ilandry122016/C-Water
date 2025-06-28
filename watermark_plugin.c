@@ -253,16 +253,15 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
   gint y2 = upper_limit_y;
   
   GimpPixelRgn rgn_in, rgn_out;
-  // guchar      *row1, *row2, *row3;
   guchar      *outrow;
   gint         width, height;
 
   gint u, v, x, y;
 
   guchar* row_arr[8];
-  double* G_matrix_val[8]; // The matrix fot the DCT (Discrete Cosine Transform)
-  double* G_prime_matrix_val[8];
-  double* G_matrix_inverse_val[8];
+  double G_matrix_val[8][8]; // The matrix fot the DCT (Discrete Cosine Transform)
+  double G_prime_matrix_val[8][8];
+  double G_matrix_inverse_val[8][8];
   int offset = 128;
   
   gimp_drawable_mask_bounds (drawable->drawable_id,
@@ -285,12 +284,7 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 
   for (int i = 0; i < 8; ++i){
     row_arr[i] = g_new(guchar, channels * (x2 - x1));
-    G_matrix_val[i] = g_new(double, channels * (x2 - x1));
-    G_prime_matrix_val[i] = g_new(double, channels * (x2 - x1));
-    G_matrix_inverse_val[i] = g_new(double, channels * (x2 - x1));
   }
-
-  printf("Crash point after initializing the matrices.\n");
 
   outrow = g_new (guchar, channels * (x2 - x1));
 
@@ -338,25 +332,23 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
       //Break up into 8x8 subblocks of pixels
 
       
-      //for (j = x1; j < x2; j++){
-	//if (j % 8 == 0){
+      //     for (gint col_offset = x1; col_offset < x2; col_offset += 8){
+      {
 	  for (u = 0; u < 8; ++u){ // u is the coordinate for the row_arr
 	    for (v = 0; v <  8; ++v){
 	      G_matrix_val[u][v] = 0;
 		
 	      for (x = 0; x <= 7; ++x){
 		for (y = 0; y <= 7; ++y){
-		  G_matrix_val[u][v] += (1.0/4) * alpha(u) * alpha(v) * (row_arr[x][y] - offset)
+		  //		  G_matrix_val[u][v] += (1.0/4) * alpha(u) * alpha(v) * (row_arr[col_offset + x][y] - offset)
+		    G_matrix_val[u][v] += (1.0/4) * alpha(u) * alpha(v) * (row_arr[x][y] - offset)
 		    * cos((2 * x + 1) * u * M_PI / 16) * cos((2 * y + 1) * v * M_PI / 16);
-		  /* if (u == 0 && v == 0){ */
-		  /*   printf("%d %d %g %d %g %g \n", x, y, G_matrix_val[u][v], row_arr[x][y], alpha(u), alpha(v)); */
-		  /* } */
 		}
 	      }
 	    }
 	  }
-	  //	}
-  //}
+	
+ 
 
       printf("row_arr:\n");
       for (j = 0; j < 8; ++j){
@@ -424,7 +416,7 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 
 	printf("\n");
       }
-      
+     }     
       printf("Crash point after G_matrix_val\n");
       gimp_pixel_rgn_set_row (&rgn_out,
 			      outrow,
@@ -439,12 +431,6 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
   for (i = 0; i < 8; ++i){
     printf("Crash point when freeing row_arr.\n");
     g_free(row_arr[i]);
-    printf("Crash point when freeing G_matrix_val.\n");
-    g_free(G_matrix_val[i]);
-    printf("Crash point when freeing G_prime_matrix_val.\n");
-    g_free(G_prime_matrix_val[i]);
-    printf("Crash point when freeing G_matrix_inverse_val.\n");
-    g_free(G_matrix_inverse_val[i]);
   }
   g_free (outrow);
 
