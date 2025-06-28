@@ -591,10 +591,17 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
   /* g_free (row1); */
   /* g_free (row2); */
   /* g_free (row3); */
+  printf("Crash point before freeing the memory.\n");
   for (i = 0; i < 8; ++i){
+    printf("Crash point when freeing row_arr.\n");
     g_free(row_arr[i]);
+    printf("Crash point when freeing G_matrix_val.\n");
     g_free(G_matrix_val[i]);
-    g_free(Q_matrix_val[i]);
+    printf("Crash point when freeing G_prime_matrix_val.\n");
+    g_free(G_prime_matrix_val[i]);
+    printf("Crash point when freeing G_matrix_inverse_val.\n");
+    g_free(G_matrix_inverse_val[i]);
+    printf("Crash point when freeing B_matrix_val.\n");
     g_free(B_matrix_val[i]);
   }
   g_free (outrow);
