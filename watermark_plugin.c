@@ -253,7 +253,7 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
   gint y2 = upper_limit_y;
   
   GimpPixelRgn rgn_in, rgn_out;
-  guchar      *outrow;
+  guchar      *outrow[8];
   gint         width, height;
 
   gint u, v, x, y;
@@ -284,14 +284,12 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 
   for (int i = 0; i < 8; ++i){
     row_arr[i] = g_new(guchar, channels * (x2 - x1));
+    outrow[i] = g_new(guchar, channels * (x2 - x1));
   }
-
-  outrow = g_new (guchar, channels * (x2 - x1));
 
   for (i = y1; i < y2; i += 8)
     {
       /* Get row i through i+7 */
-      printf("Crash point when getting row i.\n");
       gimp_pixel_rgn_get_row (&rgn_in,
                               row_arr[0],
                               x1, i,
@@ -346,25 +344,26 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 	    }
 	  }
 	
- 
+	  printf("G %d %d %d %g \n", i, col_offset, (int)(G_matrix_val[6][6]), G_matrix_val[6][6]);
+	  
 
-      printf("row_arr:\n");
-      for (j = 0; j < 8; ++j){
-	for (k = 0; k < 8; ++k){
-	  printf("%d\t", row_arr[j][k]);
-	}
+      /* printf("row_arr:\n"); */
+      /* for (j = 0; j < 8; ++j){ */
+      /* 	for (k = 0; k < 8; ++k){ */
+      /* 	  printf("%d\t", row_arr[j][k]); */
+      /* 	} */
 
-	printf("\n");
-      }
+      /* 	printf("\n"); */
+      /* } */
 
-      printf("G_matrix_val:\n");
-      for (j = 0; j < 8; ++j){
-	for (k = 0; k < 8; ++k){
-	  printf("%g\t", G_matrix_val[j][k]);
-	}
+      /* printf("G_matrix_val:\n"); */
+      /* for (j = 0; j < 8; ++j){ */
+      /* 	for (k = 0; k < 8; ++k){ */
+      /* 	  printf("%g\t", G_matrix_val[j][k]); */
+      /* 	} */
 
-	printf("\n");
-      }
+      /* 	printf("\n"); */
+      /* } */
       
       // Apply the paper to encode the watermark.
       // Compute the hash, and then encode it into the watermark (modify the matrix B).
@@ -378,14 +377,14 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 	}
       }
 
-      printf("G_prime_matrix_val:\n");
-      for (j = 0; j < 8; ++j){
-	for (k = 0; k < 8; ++k){
-	  printf("%g\t", G_prime_matrix_val[j][k]);
-	}
+      /* printf("G_prime_matrix_val:\n"); */
+      /* for (j = 0; j < 8; ++j){ */
+      /* 	for (k = 0; k < 8; ++k){ */
+      /* 	  printf("%g\t", G_prime_matrix_val[j][k]); */
+      /* 	} */
 
-	printf("\n");
-      }
+      /* 	printf("\n"); */
+      /* } */
       
       // Reverse the DCT on the new G' to get new values. Then you're done. (Multiply G' by the inverse of the DCT).
 
@@ -406,20 +405,28 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
       //G_matrix_val[6][6] = hash;
 
       
-      printf("G_matrix_inverse_val:\n");
-      for (j = 0; j < 8; ++j){
-	for (k = 0; k < 8; ++k){
-	  printf("%g\t", G_matrix_inverse_val[j][k] + offset);
-	}
+     /*  printf("G_matrix_inverse_val:\n"); */
+     /*  for (j = 0; j < 8; ++j){ */
+     /* 	for (k = 0; k < 8; ++k){ */
+     /* 	  printf("%g\t", G_matrix_inverse_val[j][k] + offset); */
+     /* 	} */
 
-	printf("\n");
+     /* 	printf("\n"); */
+     /*  } */
+      }      
+     /*  printf("Crash point after G_matrix_val\n"); */
+      
+      for (k = 0; k < 8; ++k){
+	for (j = 0; j < channels * (x2 - x1); ++j){
+	  outrow[k][j] = row_arr[k][j];
+	}
+      
+
+	gimp_pixel_rgn_set_row (&rgn_out,
+				outrow[k],
+				x1, i + k,
+				x2 - x1);
       }
-     }     
-      printf("Crash point after G_matrix_val\n");
-      gimp_pixel_rgn_set_row (&rgn_out,
-			      outrow,
-			      x1, i,
-			      x2 - x1);
 
       if (i % 10 == 0)
 	gimp_progress_update ((gdouble) (i - y1) / (gdouble) (y2 - y1));
@@ -429,10 +436,8 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
   for (i = 0; i < 8; ++i){
     printf("Crash point when freeing row_arr.\n");
     g_free(row_arr[i]);
+    g_free(outrow[i]);
   }
-  g_free (outrow);
-
-  printf(outrow);
 
   gimp_drawable_flush (drawable);
   gimp_drawable_merge_shadow (drawable->drawable_id, TRUE);
