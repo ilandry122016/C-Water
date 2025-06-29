@@ -1,5 +1,6 @@
 #include <libgimp/gimp.h>
 #include <libgimp/gimpui.h>
+#include <jbig.h>
 
 static void query (void);
 static void run (const gchar *name,
