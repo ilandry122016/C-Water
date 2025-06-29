@@ -377,6 +377,11 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 	}
       }
 
+      gint hash = 8; // Needs to be big enough to make a visible change
+      G_prime_matrix_val[6][6] += hash;
+
+      
+
       /* printf("G_prime_matrix_val:\n"); */
       /* for (j = 0; j < 8; ++j){ */
       /* 	for (k = 0; k < 8; ++k){ */
@@ -400,10 +405,6 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 	  }
 	}
       }
-
-      gint hash = 1;
-      //G_matrix_val[6][6] = hash;
-
       
      /*  printf("G_matrix_inverse_val:\n"); */
      /*  for (j = 0; j < 8; ++j){ */
@@ -419,7 +420,11 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 	  outrow[k][j + col_offset] = G_matrix_inverse_val[j][k] + offset;
 	}
       }
-	
+      /* printf("row_arr[6][6] - outrow[6][6]: before: %d %d %d %g %g \n", col_offset, */
+      /* 	     row_arr[6][6 + col_offset], outrow[6][6 + col_offset], */
+      /* 	     G_matrix_inverse_val[6][6], */
+      /* 	     row_arr[6][6 + col_offset] - (G_matrix_inverse_val[6][6] + offset)); */
+      	
 
       }      
      /*  printf("Crash point after G_matrix_val\n"); */
@@ -430,6 +435,11 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 				x1, i + k,
 				x2 - x1);
       }
+
+      /* (1.0/4) * alpha(u) * alpha(v) * G_prime_matrix_val[u][v] */
+      /* 		* cos((M_PI / 8) * (x + (1.0/2)) * u) * cos((M_PI / 8) * (y + (1.0/2)) * v); */
+	    
+      //printf("outrow[6][6]: after: %d \n", outrow[6][6]);
 
       if (i % 10 == 0)
 	gimp_progress_update ((gdouble) (i - y1) / (gdouble) (y2 - y1));
