@@ -428,7 +428,12 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 
       for (k = 0; k < 8; ++k){
 	for (j = 0; j < 8; ++j){
-	  outrow[k][j + col_offset] = G_matrix_inverse_val[j][k] + row_arr[k][j + col_offset];
+	  guchar high_bits = row_arr[k][j + col_offset] & 252;
+	  guchar low_bits = row_arr[k][j + col_offset] & 3;
+	  low_bits += G_matrix_inverse_val[j][k];
+	  low_bits = low_bits % 4;
+	  outrow[k][j + col_offset] = low_bits | high_bits;
+	  // outrow[k][j + col_offset] = G_matrix_inverse_val[j][k] + row_arr[k][j + col_offset];
 	  if (max_difference < abs((char)(outrow[k][j + col_offset] - row_arr[k][j + col_offset]))){
 	    max_difference = abs((char)(outrow[k][j + col_offset] - row_arr[k][j + col_offset]));
 	    printf("%d %d %d %d %d %d \n", k, j, col_offset, max_difference, outrow[k][j + col_offset], row_arr[k][j + col_offset]);
