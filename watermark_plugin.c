@@ -1,6 +1,6 @@
 #include <libgimp/gimp.h>
 #include <libgimp/gimpui.h>
-#include <jbig.h>
+#include <jbig85.h>
 
 static void query (void);
 static void run (const gchar *name,
@@ -86,6 +86,13 @@ struct MyWatermarkVals {
   gint radius;
   gboolean preview;
 };
+
+void output_bie(unsigned char *start, size_t len, void *file)
+{
+  // fwrite(start, 1, len, (FILE *) file);
+  
+  return;
+}
 
 void multiplyMatrix(guchar** m1, guchar** m2)
 {
@@ -458,4 +465,23 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
   gimp_drawable_update (drawable->drawable_id,
 			x1, y1,
 			x2 - x1, y2 - y1);
+
+  unsigned char bitmap[15] = {
+    /* 23 x 5 pixels, "JBIG" */
+    0x7c, 0xe2, 0x38, 0x04, 0x92, 0x40, 0x04, 0xe2,
+    0x5c, 0x44, 0x92, 0x44, 0x38, 0xe2, 0x38
+  };
+  struct jbg85_enc_state se;
+  //int i;
+  
+  jbg85_enc_init(&se, 23, 5, output_bie, stdout);      /* initialize encoder */
+  jbg85_enc_options(&se, JBG_TPBON, 0, -1);      /* clear JBG_VLENGTH option */
+  for (i = 0; i < 5; i++) {
+    /* encode line */
+    jbg85_enc_lineout(&se, bitmap+i*3, bitmap+(i-1)*3, bitmap+(i-2)*3);
+  }
+
+  for (i = 0; i < 15; ++i){
+    printf(bitmap[i] + '\n');
+  }
 }
