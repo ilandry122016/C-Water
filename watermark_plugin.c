@@ -295,6 +295,8 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
     outrow[i] = g_new(guchar, channels * (x2 - x1));
   }
 
+  gint max_difference = 0;
+
   for (i = y1; i < y2; i += 8)
     {
       /* Get row i through i+7 */
@@ -381,12 +383,13 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 
       for (j = 0; j < 8; ++j){
 	for (k = 0; k < 8; ++k){
-	  G_prime_matrix_val[j][k] = G_matrix_val[j][k];
+	  /* G_prime_matrix_val[j][k] = G_matrix_val[j][k]; */
+	  G_prime_matrix_val[j][k] = 0;
 	}
       }
 
       gint hash = 8; // Needs to be big enough to make a visible change
-      G_prime_matrix_val[6][6] += hash;
+      G_prime_matrix_val[6][6] = hash;
 
       
 
@@ -425,7 +428,11 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 
       for (k = 0; k < 8; ++k){
 	for (j = 0; j < 8; ++j){
-	  outrow[k][j + col_offset] = G_matrix_inverse_val[j][k] + offset;
+	  outrow[k][j + col_offset] = G_matrix_inverse_val[j][k] + row_arr[k][j + col_offset];
+	  if (max_difference < abs((char)(outrow[k][j + col_offset] - row_arr[k][j + col_offset]))){
+	    max_difference = abs((char)(outrow[k][j + col_offset] - row_arr[k][j + col_offset]));
+	    printf("%d %d %d %d %d %d \n", k, j, col_offset, max_difference, outrow[k][j + col_offset], row_arr[k][j + col_offset]);
+	  }
 	}
       }
       /* printf("row_arr[6][6] - outrow[6][6]: before: %d %d %d %g %g \n", col_offset, */
