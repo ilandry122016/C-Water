@@ -482,6 +482,6 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
   }
 
   for (i = 0; i < 15; ++i){
-    printf(bitmap[i] + '\n');
+    printf("%d \n",(int)(bitmap[i]));
   }
 }
