@@ -266,11 +266,15 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 
   gint u, v, x, y;
 
+  int encode_u = 6;
+  int encode_v = 6;
+
   guchar* row_arr[8];
   double G_matrix_val[8][8]; // The matrix fot the DCT (Discrete Cosine Transform)
   double G_prime_matrix_val[8][8];
   double G_matrix_inverse_val[8][8];
-  int offset = 128;
+  int offset = 128; // To map the values from 0-255 to -128-127
+  guchar* original_bits;
   
   gimp_drawable_mask_bounds (drawable->drawable_id,
                              &x1, &y1,
@@ -294,6 +298,7 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
     row_arr[i] = g_new(guchar, channels * (x2 - x1));
     outrow[i] = g_new(guchar, channels * (x2 - x1));
   }
+  original_bits = g_new(guchar, channels * (width / 8) * (height / 8 ) / 4); // We need 2 bits per 8x8 block.
 
   gint max_difference = 0;
 
@@ -389,9 +394,17 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
       }
 
       gint hash = 8; // Needs to be big enough to make a visible change
-      G_prime_matrix_val[6][6] = hash;
+      G_prime_matrix_val[encode_u][encode_v] = hash;
+      int x_block = col_offset / 8;
+      int y_block = (i - y1) / 8;
+      int block_index = x_block + y_block * channels * width / 8;
+      int original_bit_index = block_index / 4;
+      int sub_block_index = block_index & 3;
 
-      
+      int DCT_value = (int)(G_matrix_val[encode_u][encode_v]) & 3;
+      original_bits[original_bit_index] = original_bits[original_bit_index] | (DCT_value << (sub_block_index * 2));
+      printf("DCT_value: %d %d %d %d %d %d %d \n", x_block, y_block, block_index,
+	     original_bit_index, sub_block_index, DCT_value, (int)(original_bits[original_bit_index]));
 
       /* printf("G_prime_matrix_val:\n"); */
       /* for (j = 0; j < 8; ++j){ */
@@ -415,7 +428,11 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 	    }
 	  }
 	}
+
+	// printf("%d %g \n", x, cos((M_PI / 8) * (x + (1.0/2)) * 6));
       }
+
+      
       
      /*  printf("G_matrix_inverse_val:\n"); */
      /*  for (j = 0; j < 8; ++j){ */
@@ -434,10 +451,10 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 	  low_bits = low_bits % 4;
 	  outrow[k][j + col_offset] = low_bits | high_bits;
 	  // outrow[k][j + col_offset] = G_matrix_inverse_val[j][k] + row_arr[k][j + col_offset];
-	  if (max_difference < abs((char)(outrow[k][j + col_offset] - row_arr[k][j + col_offset]))){
-	    max_difference = abs((char)(outrow[k][j + col_offset] - row_arr[k][j + col_offset]));
-	    printf("%d %d %d %d %d %d \n", k, j, col_offset, max_difference, outrow[k][j + col_offset], row_arr[k][j + col_offset]);
-	  }
+	  /* if (max_difference < abs((char)(outrow[k][j + col_offset] - row_arr[k][j + col_offset]))){ */
+	  /*   max_difference = abs((char)(outrow[k][j + col_offset] - row_arr[k][j + col_offset])); */
+	  /*   printf("%d %d %d %d %d %d \n", k, j, col_offset, max_difference, outrow[k][j + col_offset], row_arr[k][j + col_offset]); */
+	  /* } */
 	}
       }
       /* printf("row_arr[6][6] - outrow[6][6]: before: %d %d %d %g %g \n", col_offset, */
