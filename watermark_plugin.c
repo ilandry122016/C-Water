@@ -89,36 +89,12 @@ struct MyWatermarkVals {
 
 void output_bie(unsigned char *start, size_t len, void *file)
 {
-  // fwrite(start, 1, len, (FILE *) file);
   
   return;
 }
 
-void multiplyMatrix(guchar** m1, guchar** m2)
-{
-  double result[8][8];
-
-  printf("Resultant Matrix is:\n");
-
-  for (int i = 0; i < 8; i++) {
-    for (int j = 0; j < 8; j++) {
-      result[i][j] = 0;
-
-      for (int k = 0; k < 8; k++) {
-	result[i][j] += m1[i][k] * m2[k][j];
-      }
-
-      printf("%d\t", result[i][j]);
-    }
-
-    printf("\n");
-  }
-}
-
-
 /* Set up default values for options */
 static struct MyWatermarkVals bvals; /* radius */
-// bvals.radius = 3;
 
 /* The radius is still a constant, we'll change that when the
  * graphical interface will be built. */
@@ -148,11 +124,7 @@ MAIN()
   gimp_ui_init("mywatermark", FALSE);
   GtkWidget *main_vbox;
   main_vbox = gtk_vbox_new (FALSE, 6);
-  printf("Crash point just before gtk_container_add.\n");
-  // gtk_container_add (GTK_CONTAINER (GTK_DIALOG (dialog)->vbox), main_vbox);
-  printf("Crash point just before gtk_widget_show.\n");
   gtk_widget_show (main_vbox);
-  printf("Crash point just before gimp_drawable_preview_new.\n");
 
   /* Setting mandatory output values */
   *nreturn_vals = 1;
@@ -170,13 +142,6 @@ MAIN()
   drawable = gimp_drawable_get (param[2].data.d_drawable);
 	
   gimp_progress_init ("My Watermark...");
-
-  /* Let's time watermark
-   *
-   *   GTimer timer = g_timer_new time ();
-   */
-
-  printf("Crash point just before watermark.\n");
 
   gint x1, y1, x2, y2;
 	
@@ -196,10 +161,6 @@ MAIN()
   guchar *subblock_pixels;
   
   watermark (drawable, pixels_to_change, x1, x2, y1, y2, channels);
-
-  /*   g_print ("watermark() took %g seconds.\n", g_timer_elapsed (timer));
-   *   g_timer_destroy (timer);
-   */
 
   gimp_displays_flush ();
   gimp_drawable_detach (drawable);
@@ -346,125 +307,71 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 
       
       for (gint col_offset = 0; col_offset < channels * (x2 - x1); col_offset += 8){
-	  for (u = 0; u < 8; ++u){ // u is the coordinate for the row_arr
-	    for (v = 0; v <  8; ++v){
-	      G_matrix_val[u][v] = 0;
+	for (u = 0; u < 8; ++u){ // u is the coordinate for the row_arr
+	  for (v = 0; v <  8; ++v){
+	    G_matrix_val[u][v] = 0;
 		
-	      for (x = 0; x <= 7; ++x){
-		for (y = 0; y <= 7; ++y){
-		  G_matrix_val[u][v] += (1.0/4) * alpha(u) * alpha(v) * (row_arr[y][col_offset + x] - offset)
-		    * cos((2 * x + 1) * u * M_PI / 16) * cos((2 * y + 1) * v * M_PI / 16);
-		}
+	    for (x = 0; x <= 7; ++x){
+	      for (y = 0; y <= 7; ++y){
+		G_matrix_val[u][v] += (1.0/4) * alpha(u) * alpha(v) * (row_arr[y][col_offset + x] - offset)
+		  * cos((2 * x + 1) * u * M_PI / 16) * cos((2 * y + 1) * v * M_PI / 16);
 	      }
 	    }
 	  }
-	
-	  //printf("G %d %d %d %g \n", i, col_offset, (int)(G_matrix_val[6][6]), G_matrix_val[6][6]);
-	  
-
-      /* printf("row_arr:\n"); */
-      /* for (j = 0; j < 8; ++j){ */
-      /* 	for (k = 0; k < 8; ++k){ */
-      /* 	  printf("%d\t", row_arr[j][k]); */
-      /* 	} */
-
-      /* 	printf("\n"); */
-      /* } */
-
-      /* printf("G_matrix_val:\n"); */
-      /* for (j = 0; j < 8; ++j){ */
-      /* 	for (k = 0; k < 8; ++k){ */
-      /* 	  printf("%g\t", G_matrix_val[j][k]); */
-      /* 	} */
-
-      /* 	printf("\n"); */
-      /* } */
-      
-      // Apply the paper to encode the watermark.
-      // Compute the hash, and then encode it into the watermark (modify the matrix B).
-      // Can use a fixed number as a hash. e.g. 1, 2, 3, 4, 5, 6, 7, 8, 9, ...
-      // Encode it into the 6,6 component of the DCT.
-      // Multiply the modified B element by element with Q (not regular multiply), and put the result in G'.
-
-      for (j = 0; j < 8; ++j){
-	for (k = 0; k < 8; ++k){
-	  /* G_prime_matrix_val[j][k] = G_matrix_val[j][k]; */
-	  G_prime_matrix_val[j][k] = 0;
 	}
-      }
+	      
+	// Apply the paper to encode the watermark.
+	// Compute the hash, and then encode it into the watermark (modify the matrix B).
+	// Can use a fixed number as a hash. e.g. 1, 2, 3, 4, 5, 6, 7, 8, 9, ...
+	// Encode it into the 6,6 component of the DCT.
+	// Multiply the modified B element by element with Q (not regular multiply), and put the result in G'.
 
-      gint hash = 8; // Needs to be big enough to make a visible change
-      G_prime_matrix_val[encode_u][encode_v] = hash;
-      int x_block = col_offset / 8;
-      int y_block = (i - y1) / 8;
-      int block_index = x_block + y_block * channels * width / 8;
-      int original_bit_index = block_index / 4;
-      int sub_block_index = block_index & 3;
-
-      int DCT_value = (int)(G_matrix_val[encode_u][encode_v]) & 3;
-      original_bits[original_bit_index] = original_bits[original_bit_index] | (DCT_value << (sub_block_index * 2));
-      printf("DCT_value: %d %d %d %d %d %d %d \n", x_block, y_block, block_index,
-	     original_bit_index, sub_block_index, DCT_value, (int)(original_bits[original_bit_index]));
-
-      /* printf("G_prime_matrix_val:\n"); */
-      /* for (j = 0; j < 8; ++j){ */
-      /* 	for (k = 0; k < 8; ++k){ */
-      /* 	  printf("%g\t", G_prime_matrix_val[j][k]); */
-      /* 	} */
-
-      /* 	printf("\n"); */
-      /* } */
-      
-      // Reverse the DCT on the new G' to get new values. Then you're done. (Multiply G' by the inverse of the DCT).
-
-      for (x = 0; x < 8; x++){
-	for (y = 0; y < 8; y++){
-	  G_matrix_inverse_val[x][y] = 0;
-
-	  for (u = 0; u < 8; u++){
-	    for (v = 0; v < 8; ++v){
-	      G_matrix_inverse_val[x][y] += (1.0/4) * alpha(u) * alpha(v) * G_prime_matrix_val[u][v]
-		* cos((M_PI / 8) * (x + (1.0/2)) * u) * cos((M_PI / 8) * (y + (1.0/2)) * v);
-	    }
+	for (j = 0; j < 8; ++j){
+	  for (k = 0; k < 8; ++k){
+	    G_prime_matrix_val[j][k] = 0;
 	  }
 	}
 
-	// printf("%d %g \n", x, cos((M_PI / 8) * (x + (1.0/2)) * 6));
-      }
+	gint hash = 8; // Needs to be big enough to make a visible change
+	G_prime_matrix_val[encode_u][encode_v] = hash;
+	int x_block = col_offset / 8;
+	int y_block = (i - y1) / 8;
+	int block_index = x_block + y_block * channels * width / 8;
+	int original_bit_index = block_index / 4;
+	int sub_block_index = block_index & 3;
 
+	int DCT_value = (int)(G_matrix_val[encode_u][encode_v]) & 3;
+	original_bits[original_bit_index] = original_bits[original_bit_index] | (DCT_value << (sub_block_index * 2));
+	printf("DCT_value: %d %d %d %d %d %d %d \n", x_block, y_block, block_index,
+	       original_bit_index, sub_block_index, DCT_value, (int)(original_bits[original_bit_index]));
       
-      
-     /*  printf("G_matrix_inverse_val:\n"); */
-     /*  for (j = 0; j < 8; ++j){ */
-     /* 	for (k = 0; k < 8; ++k){ */
-     /* 	  printf("%g\t", G_matrix_inverse_val[j][k] + offset); */
-     /* 	} */
+	// Reverse the DCT on the new G' to get new values. Then you're done. (Multiply G' by the inverse of the DCT).
 
-     /* 	printf("\n"); */
-     /*  } */
+	for (x = 0; x < 8; x++){
+	  for (y = 0; y < 8; y++){
+	    G_matrix_inverse_val[x][y] = 0;
 
-      for (k = 0; k < 8; ++k){
-	for (j = 0; j < 8; ++j){
-	  guchar high_bits = row_arr[k][j + col_offset] & 252;
-	  guchar low_bits = row_arr[k][j + col_offset] & 3;
-	  low_bits += G_matrix_inverse_val[j][k];
-	  low_bits = low_bits % 4;
-	  outrow[k][j + col_offset] = low_bits | high_bits;
-	  // outrow[k][j + col_offset] = G_matrix_inverse_val[j][k] + row_arr[k][j + col_offset];
-	  /* if (max_difference < abs((char)(outrow[k][j + col_offset] - row_arr[k][j + col_offset]))){ */
-	  /*   max_difference = abs((char)(outrow[k][j + col_offset] - row_arr[k][j + col_offset])); */
-	  /*   printf("%d %d %d %d %d %d \n", k, j, col_offset, max_difference, outrow[k][j + col_offset], row_arr[k][j + col_offset]); */
-	  /* } */
+	    for (u = 0; u < 8; u++){
+	      for (v = 0; v < 8; ++v){
+		G_matrix_inverse_val[x][y] += (1.0/4) * alpha(u) * alpha(v) * G_prime_matrix_val[u][v]
+		  * cos((M_PI / 8) * (x + (1.0/2)) * u) * cos((M_PI / 8) * (y + (1.0/2)) * v);
+	      }
+	    }
+	  }
+
 	}
-      }
-      /* printf("row_arr[6][6] - outrow[6][6]: before: %d %d %d %g %g \n", col_offset, */
-      /* 	     row_arr[6][6 + col_offset], outrow[6][6 + col_offset], */
-      /* 	     G_matrix_inverse_val[6][6], */
-      /* 	     row_arr[6][6 + col_offset] - (G_matrix_inverse_val[6][6] + offset)); */
-      	
 
+	for (k = 0; k < 8; ++k){
+	  for (j = 0; j < 8; ++j){
+	    guchar high_bits = row_arr[k][j + col_offset] & 252;
+	    guchar low_bits = row_arr[k][j + col_offset] & 3;
+	    low_bits += G_matrix_inverse_val[j][k];
+	    low_bits = low_bits % 4;
+	    outrow[k][j + col_offset] = low_bits | high_bits;
+
+	  }
+	}
       }      
-     /*  printf("Crash point after G_matrix_val\n"); */
       for (k = 0; k < 8; ++k){
 	
 	gimp_pixel_rgn_set_row (&rgn_out,
@@ -472,11 +379,6 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 				x1, i + k,
 				x2 - x1);
       }
-
-      /* (1.0/4) * alpha(u) * alpha(v) * G_prime_matrix_val[u][v] */
-      /* 		* cos((M_PI / 8) * (x + (1.0/2)) * u) * cos((M_PI / 8) * (y + (1.0/2)) * v); */
-	    
-      //printf("outrow[6][6]: after: %d \n", outrow[6][6]);
 
       if (i % 10 == 0)
 	gimp_progress_update ((gdouble) (i - y1) / (gdouble) (y2 - y1));
@@ -501,7 +403,6 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
     0x5c, 0x44, 0x92, 0x44, 0x38, 0xe2, 0x38
   };
   struct jbg85_enc_state se;
-  //int i;
   
   jbg85_enc_init(&se, 23, 5, output_bie, stdout);      /* initialize encoder */
   jbg85_enc_options(&se, JBG_TPBON, 0, -1);      /* clear JBG_VLENGTH option */
