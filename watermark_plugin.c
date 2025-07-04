@@ -1,6 +1,7 @@
 #include <libgimp/gimp.h>
 #include <libgimp/gimpui.h>
-#include <jbig85.h>
+// #include <jbig85.h>
+#include <jbig.h>
 
 static void query (void);
 static void run (const gchar *name,
@@ -74,6 +75,10 @@ static void shuffle (GimpPixelRgn *rgn_in,
 		     gint height,
 		     gint ypos);
 
+// global variables
+unsigned char encrypted_data[1000];
+size_t current_len = 0;
+
 // helper function
 static double alpha(gint i){
   if (i == 0){
@@ -89,6 +94,10 @@ struct MyWatermarkVals {
 
 void output_bie(unsigned char *start, size_t len, void *file)
 {
+  for (int i = 0; i < len; ++i){
+    encrypted_data[current_len + i] = start[i];
+  }
+  current_len += len;
   
   return;
 }
@@ -402,16 +411,31 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
     0x7c, 0xe2, 0x38, 0x04, 0x92, 0x40, 0x04, 0xe2,
     0x5c, 0x44, 0x92, 0x44, 0x38, 0xe2, 0x38
   };
-  struct jbg85_enc_state se;
-  
-  jbg85_enc_init(&se, 23, 5, output_bie, stdout);      /* initialize encoder */
-  jbg85_enc_options(&se, JBG_TPBON, 0, -1);      /* clear JBG_VLENGTH option */
-  for (i = 0; i < 5; i++) {
-    /* encode line */
-    jbg85_enc_lineout(&se, bitmap+i*3, bitmap+(i-1)*3, bitmap+(i-2)*3);
-  }
 
-  for (i = 0; i < 15; ++i){
-    printf("%d \n",(int)(bitmap[i]));
-  }
+  unsigned char *bitmaps[1] = { bitmap };
+  struct jbg_enc_state se;
+ 
+  jbg_enc_init(&se, 46, 25, 1, bitmaps, 
+	       output_bie, stdout);              /* initialize encoder */
+  jbg_enc_out(&se);                                    /* encode image */
+  jbg_enc_free(&se);                    /* release allocated resources */
+
+  int current_len = 15;
+
+  printf("current_len: %d \n", current_len);
+  //printf("Program finished.\n");
+
+  struct jbg_dec_state sd;
+   
+  jbg_dec_init(&sd);
+  //  jbg_dec_maxsize(&sd, 46, 25);
+  size_t jbig_offset;
+  jbg_dec_in(&sd, encrypted_data, current_len, &jbig_offset);
+  printf("jbig_offset: %d \n", jbig_offset);
+
+  int number_of_planes = jbg_dec_getplanes(&sd);
+  unsigned char* result_bitmap = jbg_dec_getimage(&sd, 0);
+  long result_size = jbg_dec_getsize(&sd);
+
+  printf("Result size: %d \n", result_size);
 }
