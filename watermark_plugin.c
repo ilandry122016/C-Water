@@ -273,7 +273,9 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
     row_arr[i] = g_new(guchar, channels * (x2 - x1));
     outrow[i] = g_new(guchar, channels * (x2 - x1));
   }
-  original_bits = g_new(guchar, channels * (width / 8) * (height / 8 ) / 4); // We need 2 bits per 8x8 block.
+
+  size_t original_bits_size = channels * (width / 8) * (height / 8 ) / 4;
+  original_bits = g_new(guchar, original_bits_size); // We need 2 bits per 8x8 block. One is for the signal, and the other is for the modulator.
 
   gint max_difference = 0;
 
@@ -417,29 +419,26 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 			x1, y1,
 			x2 - x1, y2 - y1);
 
-  unsigned char bitmap[15] = {
-    /* 23 x 5 pixels, "JBIG" */
-    0x7c, 0xe2, 0x38, 0x04, 0x92, 0x40, 0x04, 0xe2,
-    0x5c, 0x44, 0x92, 0x44, 0x38, 0xe2, 0x38
-  };
+  /* unsigned char bitmap[15] = { */
+  /*   /\* 23 x 5 pixels, "JBIG" *\/ */
+  /*   0x7c, 0xe2, 0x38, 0x04, 0x92, 0x40, 0x04, 0xe2, */
+  /*   0x5c, 0x44, 0x92, 0x44, 0x38, 0xe2, 0x38 */
+  /* }; */
 
-  unsigned char *bitmaps[1] = { bitmap };
+  unsigned char *bitmaps[1] = {original_bits};
   struct jbg_enc_state se;
  
-  jbg_enc_init(&se, 46, 25, 1, bitmaps, 
+  jbg_enc_init(&se, (channels * width / 8) / 4, height / 8, 1, bitmaps, 
 	       output_bie, stdout);              /* initialize encoder */
   jbg_enc_out(&se);                                    /* encode image */
   jbg_enc_free(&se);                    /* release allocated resources */
 
-  int current_len = 15;
-
+  printf("original_bits_size: %d \n", original_bits_size);
   printf("current_len: %d \n", current_len);
-  //printf("Program finished.\n");
 
   struct jbg_dec_state sd;
    
   jbg_dec_init(&sd);
-  //  jbg_dec_maxsize(&sd, 46, 25);
   size_t jbig_offset;
   jbg_dec_in(&sd, encrypted_data, current_len, &jbig_offset);
   printf("jbig_offset: %d \n", jbig_offset);
