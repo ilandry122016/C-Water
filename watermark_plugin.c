@@ -2,6 +2,11 @@
 #include <libgimp/gimpui.h>
 // #include <jbig85.h>
 #include <jbig.h>
+#include "blake3.h"
+#include <errno.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
 
 static void query (void);
 static void run (const gchar *name,
@@ -272,6 +277,11 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 
   gint max_difference = 0;
 
+  // Initialize the hasher.
+  blake3_hasher hasher;
+  blake3_hasher_init(&hasher);
+
+
   for (i = y1; i < y2; i += 8)
     {
       /* Get row i through i+7 */
@@ -308,8 +318,13 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
                               x1, MIN (y2 - 1, i + 7),
                               x2 - x1);
 
-      // Create A DCT matrix for the rows.
+      for (j = 0; j < 8; ++j){
+	blake3_hasher_update(&hasher, row_arr[j], channels * (x2 - x1));
+      }
 
+
+      // Create A DCT matrix for the rows.
+      
       
 
       //Break up into 8x8 subblocks of pixels
@@ -351,9 +366,7 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 
 	int DCT_value = (int)(G_matrix_val[encode_u][encode_v]) & 3;
 	original_bits[original_bit_index] = original_bits[original_bit_index] | (DCT_value << (sub_block_index * 2));
-	printf("DCT_value: %d %d %d %d %d %d %d \n", x_block, y_block, block_index,
-	       original_bit_index, sub_block_index, DCT_value, (int)(original_bits[original_bit_index]));
-      
+	      
 	// Reverse the DCT on the new G' to get new values. Then you're done. (Multiply G' by the inverse of the DCT).
 
 	for (x = 0; x < 8; x++){
@@ -393,9 +406,7 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 	gimp_progress_update ((gdouble) (i - y1) / (gdouble) (y2 - y1));
     }
 
-  printf("Crash point before freeing the memory.\n");
   for (i = 0; i < 8; ++i){
-    printf("Crash point when freeing row_arr.\n");
     g_free(row_arr[i]);
     g_free(outrow[i]);
   }
@@ -438,4 +449,14 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
   long result_size = jbg_dec_getsize(&sd);
 
   printf("Result size: %d \n", result_size);
+
+  // Finalize the hash. BLAKE3_OUT_LEN is the default output length, 32 bytes.
+  uint8_t output[BLAKE3_OUT_LEN];
+  blake3_hasher_finalize(&hasher, output, BLAKE3_OUT_LEN);
+
+  // Print the hash as hexadecimal.
+  for (size_t i = 0; i < BLAKE3_OUT_LEN; i++) {
+    printf("%02x", output[i]);
+  }
+  printf("\n");
 }
