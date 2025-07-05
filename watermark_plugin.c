@@ -387,6 +387,18 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
   // Keep all the rest of the bits the same.
   memcpy(new_bits + BLAKE3_OUT_LEN + current_len, original_bits + BLAKE3_OUT_LEN + current_len,
 	 original_bits_size - BLAKE3_OUT_LEN - current_len);
+
+  // Based on values with the following equation:
+  // 0.5 * cos((2 * x + 1) * u * M_PI / 16)
+  // with u = 6, and x = 0,1,...,7
+  double cos_arr[8] = {0.191341716182545,
+		       -0.461939766255643,
+		       0.461939766255643,
+		       -0.191341716182545,
+		       -0.191341716182545,
+		       0.461939766255643,
+		       -0.461939766255643,
+		       0.19134171618254};
   
   for (i = y1; i < y2; i += 8)
     {
@@ -447,16 +459,45 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 	int original_bit_index = block_index / 4;
 	int sub_block_index = block_index & 3;
 
+	int new_value = (new_bits[original_bit_index] >> (sub_block_index * 2)) & 3;
 	// We change values of the original image such that the DCT changes to what we want.
 	// Get the lowest 2 integer bits of G[6][6].
 	int DCT_value = (int)(G_matrix_val[encode_u][encode_v]) & 3;
-	original_bits[original_bit_index] = original_bits[original_bit_index] | (DCT_value << (sub_block_index * 2));
-	     
+	 
+	if (new_value > DCT_value){
+	  DCT_value += 4;
+	}
+	
+	double DCT_float_val = DCT_value + remainder(G_matrix_val[encode_u][encode_v], 1.0);
+	double cushion = 0.001;
+	 
+	double min_diff = DCT_float_val - new_value - 1 + cushion;
+	for (x = 0; x <= 7 && min_diff > 0; ++x){
+	  for (y = 0; y <= 7 && min_diff > 0; ++y){
+	    double coefficient = cos_arr[x] * cos_arr[y];
+	    if (coefficient > 0){
+	      if (row_arr[y][col_offset + x] > 0){
+		--row_arr[y][col_offset + x];
+		min_diff -= coefficient;
+	      }
+	    }
+	    else{
+	      if (row_arr[y][col_offset + x] < 255){
+		++row_arr[y][col_offset + x];
+		min_diff += coefficient;
+	      }
+	    }
+	  }
+	}
       }      
 
+      
+      
       if (i % 10 == 0)
 	gimp_progress_update ((gdouble) (i - y1) / (gdouble) (y2 - y1));
     }
+
+  
 
   for (i = 0; i < 8; ++i){
     g_free(row_arr[i]);
