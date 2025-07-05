@@ -419,12 +419,6 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 			x1, y1,
 			x2 - x1, y2 - y1);
 
-  /* unsigned char bitmap[15] = { */
-  /*   /\* 23 x 5 pixels, "JBIG" *\/ */
-  /*   0x7c, 0xe2, 0x38, 0x04, 0x92, 0x40, 0x04, 0xe2, */
-  /*   0x5c, 0x44, 0x92, 0x44, 0x38, 0xe2, 0x38 */
-  /* }; */
-
   unsigned char *bitmaps[1] = {original_bits};
   struct jbg_enc_state se;
  
@@ -443,10 +437,15 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
   jbg_dec_in(&sd, encrypted_data, current_len, &jbig_offset);
   printf("jbig_offset: %d \n", jbig_offset);
 
+
+  unsigned long result_width = jbg_dec_getwidth(&sd);
+  unsigned long result_height = jbg_dec_getheight(&sd);
   int number_of_planes = jbg_dec_getplanes(&sd);
   unsigned char* result_bitmap = jbg_dec_getimage(&sd, 0);
-  long result_size = jbg_dec_getsize(&sd);
-
+  unsigned long result_size = jbg_dec_getsize(&sd);
+  
+  printf("Result width: %d \n", result_width);
+  printf("Result height: %d \n", result_height);
   printf("Result size: %d \n", result_size);
 
   // Finalize the hash. BLAKE3_OUT_LEN is the default output length, 32 bytes.
