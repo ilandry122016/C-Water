@@ -345,73 +345,22 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 	    }
 	  }
 	}
-	      
-	// Apply the paper to encode the watermark.
-	// Compute the hash, and then encode it into the watermark (modify the matrix B).
-	// Can use a fixed number as a hash. e.g. 1, 2, 3, 4, 5, 6, 7, 8, 9, ...
-	// Encode it into the 6,6 component of the DCT.
-	// Multiply the modified B element by element with Q (not regular multiply), and put the result in G'.
-
-	for (j = 0; j < 8; ++j){
-	  for (k = 0; k < 8; ++k){
-	    G_prime_matrix_val[j][k] = 0;
-	  }
-	}
-
-	gint hash = 8; // Needs to be big enough to make a visible change
-	G_prime_matrix_val[encode_u][encode_v] = hash;
+			
 	int x_block = col_offset / 8;
 	int y_block = (i - y1) / 8;
 	int block_index = x_block + y_block * channels * width / 8;
 	int original_bit_index = block_index / 4;
 	int sub_block_index = block_index & 3;
 
+	// Get the lowest 2 integer bits of G[6][6].
 	int DCT_value = (int)(G_matrix_val[encode_u][encode_v]) & 3;
 	original_bits[original_bit_index] = original_bits[original_bit_index] | (DCT_value << (sub_block_index * 2));
-	      
-	// Reverse the DCT on the new G' to get new values. Then you're done. (Multiply G' by the inverse of the DCT).
-
-	for (x = 0; x < 8; x++){
-	  for (y = 0; y < 8; y++){
-	    G_matrix_inverse_val[x][y] = 0;
-
-	    for (u = 0; u < 8; u++){
-	      for (v = 0; v < 8; ++v){
-		G_matrix_inverse_val[x][y] += (1.0/4) * alpha(u) * alpha(v) * G_prime_matrix_val[u][v]
-		  * cos((M_PI / 8) * (x + (1.0/2)) * u) * cos((M_PI / 8) * (y + (1.0/2)) * v);
-	      }
-	    }
-	  }
-
-	}
-
-	for (k = 0; k < 8; ++k){
-	  for (j = 0; j < 8; ++j){
-	    guchar high_bits = row_arr[k][j + col_offset] & 252;
-	    guchar low_bits = row_arr[k][j + col_offset] & 3;
-	    low_bits += G_matrix_inverse_val[j][k];
-	    low_bits = low_bits % 4;
-	    outrow[k][j + col_offset] = low_bits | high_bits;
-
-	  }
-	}
+	     
       }      
-      for (k = 0; k < 8; ++k){
-	
-	gimp_pixel_rgn_set_row (&rgn_out,
-				outrow[k],
-				x1, i + k,
-				x2 - x1);
-      }
 
       if (i % 10 == 0)
 	gimp_progress_update ((gdouble) (i - y1) / (gdouble) (y2 - y1));
     }
-
-  for (i = 0; i < 8; ++i){
-    g_free(row_arr[i]);
-    g_free(outrow[i]);
-  }
 
    // Finalize the hash. BLAKE3_OUT_LEN is the default output length, 32 bytes.
   uint8_t blake3_hash[BLAKE3_OUT_LEN];
@@ -430,4 +379,9 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 	       output_bie, stdout);              /* initialize encoder */
   jbg_enc_out(&se);                                    /* encode image */
   jbg_enc_free(&se);                    /* release allocated resources */
+
+  for (i = 0; i < 8; ++i){
+    g_free(row_arr[i]);
+    g_free(outrow[i]);
+  }
 }
