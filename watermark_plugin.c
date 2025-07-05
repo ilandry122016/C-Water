@@ -413,6 +413,10 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
     g_free(outrow[i]);
   }
 
+   // Finalize the hash. BLAKE3_OUT_LEN is the default output length, 32 bytes.
+  uint8_t blake3_hash[BLAKE3_OUT_LEN];
+  blake3_hasher_finalize(&hasher, blake3_hash, BLAKE3_OUT_LEN);
+
   gimp_drawable_flush (drawable);
   gimp_drawable_merge_shadow (drawable->drawable_id, TRUE);
   gimp_drawable_update (drawable->drawable_id,
@@ -426,35 +430,4 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 	       output_bie, stdout);              /* initialize encoder */
   jbg_enc_out(&se);                                    /* encode image */
   jbg_enc_free(&se);                    /* release allocated resources */
-
-  printf("original_bits_size: %d \n", original_bits_size);
-  printf("current_len: %d \n", current_len);
-
-  struct jbg_dec_state sd;
-   
-  jbg_dec_init(&sd);
-  size_t jbig_offset;
-  jbg_dec_in(&sd, encrypted_data, current_len, &jbig_offset);
-  printf("jbig_offset: %d \n", jbig_offset);
-
-
-  unsigned long result_width = jbg_dec_getwidth(&sd);
-  unsigned long result_height = jbg_dec_getheight(&sd);
-  int number_of_planes = jbg_dec_getplanes(&sd);
-  unsigned char* result_bitmap = jbg_dec_getimage(&sd, 0);
-  unsigned long result_size = jbg_dec_getsize(&sd);
-  
-  printf("Result width: %d \n", result_width);
-  printf("Result height: %d \n", result_height);
-  printf("Result size: %d \n", result_size);
-
-  // Finalize the hash. BLAKE3_OUT_LEN is the default output length, 32 bytes.
-  uint8_t output[BLAKE3_OUT_LEN];
-  blake3_hasher_finalize(&hasher, output, BLAKE3_OUT_LEN);
-
-  // Print the hash as hexadecimal.
-  for (size_t i = 0; i < BLAKE3_OUT_LEN; i++) {
-    printf("%02x", output[i]);
-  }
-  printf("\n");
 }
