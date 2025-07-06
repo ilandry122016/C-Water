@@ -273,7 +273,7 @@ verify_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_li
 	int sub_block_index = block_index & 3;
 
 	// Get the lowest 2 integer bits of G[6][6].
-	int DCT_value = (int)(G_matrix_val[encode_u][encode_v]) & 3;
+	int DCT_value = (int)(floor(G_matrix_val[encode_u][encode_v])) & 3;
 	original_bits[original_bit_index] = original_bits[original_bit_index] | (DCT_value << (sub_block_index * 2));
 	     
       }      
@@ -281,6 +281,10 @@ verify_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_li
       if (i % 10 == 0)
 	gimp_progress_update ((gdouble) (i - y1) / (gdouble) (y2 - y1));
     }
+
+  for (i = 0; i < 100; ++i){
+    printf("bits: %d %.2x \n", i, original_bits[i]); 
+  }
 
    // Finalize the hash. BLAKE3_OUT_LEN is the default output length, 32 bytes.
   uint8_t blake3_hash[BLAKE3_OUT_LEN];
@@ -376,7 +380,7 @@ verify_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_li
 	int new_value = (new_bits[original_bit_index] >> (sub_block_index * 2)) & 3;
 	// We change values of the original image such that the DCT changes to what we want.
 	// Get the lowest 2 integer bits of G[6][6].
-	int DCT_value = (int)(G_matrix_val[encode_u][encode_v]) & 3;
+	int DCT_value = (int)(floor(G_matrix_val[encode_u][encode_v])) & 3;
 	 
 	if (new_value > DCT_value){
 	  DCT_value += 4;

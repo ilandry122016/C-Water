@@ -282,7 +282,7 @@ add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit
 	gimp_progress_update ((gdouble) (i - y1) / (gdouble) (y2 - y1));
     }
 
-   // Finalize the hash. BLAKE3_OUT_LEN is the default output length, 32 bytes.
+  // Finalize the hash. BLAKE3_OUT_LEN is the default output length, 32 bytes.
   uint8_t blake3_hash[BLAKE3_OUT_LEN];
   blake3_hasher_finalize(&hasher, blake3_hash, BLAKE3_OUT_LEN);
 
@@ -301,6 +301,10 @@ add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit
   // Keep all the rest of the bits the same.
   memcpy(new_bits + BLAKE3_OUT_LEN + current_len, original_bits + BLAKE3_OUT_LEN + current_len,
 	 original_bits_size - BLAKE3_OUT_LEN - current_len);
+
+  for (i = 0; i < 100; ++i){
+    printf("bits: %d %.2x \n", i, new_bits[i]); 
+  }
 
   // Based on values with the following equation:
   // 0.5 * cos((2 * x + 1) * u * M_PI / 16)
@@ -376,16 +380,24 @@ add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit
 	int new_value = (new_bits[original_bit_index] >> (sub_block_index * 2)) & 3;
 	// We change values of the original image such that the DCT changes to what we want.
 	// Get the lowest 2 integer bits of G[6][6].
-	int DCT_value = (int)(G_matrix_val[encode_u][encode_v]) & 3;
-	 
+	int DCT_value = (int)(floor(G_matrix_val[encode_u][encode_v])) & 3;
+	
 	if (new_value > DCT_value){
 	  DCT_value += 4;
 	}
 	
-	double DCT_float_val = DCT_value + remainder(G_matrix_val[encode_u][encode_v], 1.0);
+	double DCT_float_val = DCT_value + G_matrix_val[encode_u][encode_v] - floor(G_matrix_val[encode_u][encode_v]);
 	double cushion = 0.001;
 	 
 	double min_diff = DCT_float_val - new_value - 1 + cushion;
+	
+	if (col_offset == 6 * 8 && y_block == 0){
+	  printf("00: %d %d %d %d %d %d %d %g %g %g %d %g \n", x_block, y_block, block_index,
+		 original_bit_index, sub_block_index, new_value, DCT_value,
+		 DCT_float_val, G_matrix_val[encode_u][encode_v], min_diff,
+		 ((int)(floor(G_matrix_val[encode_u][encode_v])) & 3),  G_matrix_val[encode_u][encode_v] - floor(G_matrix_val[encode_u][encode_v]));
+	}
+
 	for (x = 0; x <= 7 && min_diff > 0; ++x){
 	  for (y = 0; y <= 7 && min_diff > 0; ++y){
 	    double coefficient = cos_arr[x] * cos_arr[y];
@@ -401,17 +413,30 @@ add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit
 		min_diff += coefficient;
 	      }
 	    }
+
+	    if (col_offset == 6 * 8 && y_block == 0){
+	      double G_6_6 = 0;
+	      const int u = 6;
+	      const int v = 6;
+	      for (int xx = 0; xx <= 7; ++xx){
+		for (int yy = 0; yy <= 7; ++yy){
+		  G_6_6 += (1.0/4) * alpha(u) * alpha(v) * (row_arr[yy][col_offset + xx] - offset)
+		    * cos((2 * xx + 1) * u * M_PI / 16) * cos((2 * yy + 1) * v * M_PI / 16);
+		}
+	      }
+	      printf("G_6_6: %g %g %g %d \n", G_6_6, min_diff, coefficient, ((int)(floor(G_6_6)) & 3));
+	    }
 	  }
 	}
       }      
 
-       for (k = 0; k < 8; ++k){
+      for (k = 0; k < 8; ++k){
 	
 	gimp_pixel_rgn_set_row (&rgn_out,
 				row_arr[k],
 				x1, i + k,
 				x2 - x1);
-       }    
+      }    
       
       if (i % 10 == 0)
 	gimp_progress_update ((gdouble) (i - y1) / (gdouble) (y2 - y1));
