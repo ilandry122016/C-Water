@@ -365,12 +365,6 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
   uint8_t blake3_hash[BLAKE3_OUT_LEN];
   blake3_hasher_finalize(&hasher, blake3_hash, BLAKE3_OUT_LEN);
 
-  gimp_drawable_flush (drawable);
-  gimp_drawable_merge_shadow (drawable->drawable_id, TRUE);
-  gimp_drawable_update (drawable->drawable_id,
-			x1, y1,
-			x2 - x1, y2 - y1);
-
   unsigned char *bitmaps[1] = {original_bits};
   struct jbg_enc_state se;
  
@@ -490,7 +484,13 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 	}
       }      
 
-      
+       for (k = 0; k < 8; ++k){
+	
+	gimp_pixel_rgn_set_row (&rgn_out,
+				row_arr[k],
+				x1, i + k,
+				x2 - x1);
+       }    
       
       if (i % 10 == 0)
 	gimp_progress_update ((gdouble) (i - y1) / (gdouble) (y2 - y1));
@@ -502,4 +502,10 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
     g_free(row_arr[i]);
     g_free(outrow[i]);
   }
+
+  gimp_drawable_flush (drawable);
+  gimp_drawable_merge_shadow (drawable->drawable_id, TRUE);
+  gimp_drawable_update (drawable->drawable_id,
+			x1, y1,
+			x2 - x1, y2 - y1);
 }
