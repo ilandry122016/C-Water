@@ -178,7 +178,6 @@ add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit
   width = x2 - x1;
   height = y2 - y1;
     
-
   gimp_pixel_rgn_init (&rgn_in,
                        drawable,
                        x1, y1,
@@ -202,7 +201,6 @@ add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit
   // Initialize the hasher.
   blake3_hasher hasher;
   blake3_hasher_init(&hasher);
-
 
   for (i = y1; i < y2; i += 8)
     {
@@ -244,13 +242,8 @@ add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit
 	blake3_hasher_update(&hasher, row_arr[j], channels * (x2 - x1));
       }
 
-
       // Create A DCT matrix for the rows.
-      
-      
-
-      //Break up into 8x8 subblocks of pixels
-
+      // Break up into 8x8 subblocks of pixels
       
       for (gint col_offset = 0; col_offset < channels * (x2 - x1); col_offset += 8){
 	for (u = 0; u < 8; ++u){ // u is the coordinate for the row_arr
