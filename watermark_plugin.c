@@ -14,70 +14,18 @@ static void run (const gchar *name,
 		 gint *nreturn_vals,
 		 GimpParam **return_vals);
 
-void gimp_pixel_rgn_get_pixel (GimpPixelRgn *pr,
-			       guchar *buf,
-			       gint x,
-			       gint y);
 void gimp_pixel_rgn_get_row (GimpPixelRgn *pr,
 			     guchar *buf,
 			     gint x,
 			     gint y,
 			     gint width);
-void gimp_pixel_rgn_get_col (GimpPixelRgn *pr,
-			     guchar *buf,
-			     gint x,
-			     gint y,
-			     gint width);
-void gimp_pixel_rgn_get_rect (GimpPixelRgn *pr,
-			      guchar *buf,
-			      gint x,
-			      gint y,
-			      gint width,
-			      gint height);
-void gimp_pixel_rgn_set_pixel (GimpPixelRgn *pr,
-			       const guchar *buf,
-			       gint x,
-			       gint y);
 void gimp_pixel_rgn_set_row (GimpPixelRgn *pr,
 			     const guchar *buf,
 			     gint x,
 			     gint y,
 			     gint width);
-void gimp_pixel_rgn_set_col (GimpPixelRgn *pr,
-			     const guchar *buf,
-			     gint x,
-			     gint y,
-			     gint height);
-void gimp_pixel_rgn_set_rect (GimpPixelRgn *pr,
-			      const guchar *buf,
-			      gint x,
-			      gint y,
-			      gint width,
-			      gint height);
 
 static void watermark (GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, gint lower_limit_y, gint upper_limit_x, gint upper_limit_y, gint channels);
-
-static gboolean
-watermark_dialog (GimpDrawable *drawable);
-
-static void init_mem (guchar ***row,
-		      guchar **outrow,
-		      gint num_bytes);
-static void process_row (guchar **row,
-			 guchar *outrow,
-			 gint x1,
-			 gint y1,
-			 gint width,
-			 gint height,
-			 gint channels,
-			 gint i);
-static void shuffle (GimpPixelRgn *rgn_in,
-		     guchar **row,
-		     gint x1,
-		     gint y1,
-		     gint width,
-		     gint height,
-		     gint ypos);
 
 // global variables
 unsigned char compressed_data[1000];
@@ -91,11 +39,6 @@ static double alpha(gint i){
   return 1;
 }
 
-struct MyWatermarkVals {
-  gint radius;
-  gboolean preview;
-};
-
 void output_bie(unsigned char *start, size_t len, void *file)
 {
   for (int i = 0; i < len; ++i){
@@ -105,13 +48,6 @@ void output_bie(unsigned char *start, size_t len, void *file)
   
   return;
 }
-
-/* Set up default values for options */
-static struct MyWatermarkVals bvals; /* radius */
-
-/* The radius is still a constant, we'll change that when the
- * graphical interface will be built. */
-static gint radius = 3;
 
 GimpPlugInInfo PLUG_IN_INFO = {
   NULL,
@@ -142,7 +78,6 @@ MAIN()
   /* Setting mandatory output values */
   *nreturn_vals = 1;
   *return_vals  = values;
-  bvals.radius = 3;
 
   values[0].type = GIMP_PDB_STATUS;
   values[0].data.d_status = status;
@@ -166,23 +101,11 @@ MAIN()
   gint channels = gimp_drawable_bpp (drawable->drawable_id);
   pixels_to_change = g_new(guchar, channels * (x2 - x1) * (y2 - y1));
 
-  GimpPixelRgn rgn_in, rgn_out;
-  guchar      *row1, *row2, *row3;
-  guchar      *outrow;
-  gint         width, height;
-
-  guchar *subblock_pixels;
-  
   watermark (drawable, pixels_to_change, x1, x2, y1, y2, channels);
 
   gimp_displays_flush ();
   gimp_drawable_detach (drawable);
-
 	
-  /*  Finally, set options in the core  */
-  if (run_mode == GIMP_RUN_INTERACTIVE)
-    gimp_set_data ("plug-in-mywatermark", &bvals, sizeof (struct MyWatermarkVals));
-
   return;
 }
 
