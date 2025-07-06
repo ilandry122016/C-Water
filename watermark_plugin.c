@@ -235,7 +235,6 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
   gint y2 = upper_limit_y;
   
   GimpPixelRgn rgn_in, rgn_out;
-  guchar      *outrow[8];
   gint         width, height;
 
   gint u, v, x, y;
@@ -270,7 +269,6 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 
   for (int i = 0; i < 8; ++i){
     row_arr[i] = g_new(guchar, channels * (x2 - x1));
-    outrow[i] = g_new(guchar, channels * (x2 - x1));
   }
 
   size_t original_bits_size = channels * (width / 8) * (height / 8 ) / 4;
@@ -500,7 +498,6 @@ watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, 
 
   for (i = 0; i < 8; ++i){
     g_free(row_arr[i]);
-    g_free(outrow[i]);
   }
 
   gimp_drawable_flush (drawable);
