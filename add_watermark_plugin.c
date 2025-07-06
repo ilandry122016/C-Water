@@ -379,18 +379,23 @@ add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit
 	double cushion = 0.001;
 	 
 	double min_diff = DCT_float_val - new_value - 1 + cushion;
-	
+		
 	for (x = 0; x <= 7 && min_diff > 0; ++x){
 	  for (y = 0; y <= 7 && min_diff > 0; ++y){
 	    double coefficient = cos_arr[x] * cos_arr[y];
 	    if (coefficient > 0){
-	      if (row_arr[y][col_offset + x] > 0){
+	      // Do not modify values if it is 0 or 1. Then we know
+	      // that if we see a 0, don't modify it. This clarifies
+	      // the edge case of trying to subtract from 0 or add to
+	      // 255.
+	      if (row_arr[y][col_offset + x] > 1){
 		--row_arr[y][col_offset + x];
 		min_diff -= coefficient;
 	      }
 	    }
 	    else{
-	      if (row_arr[y][col_offset + x] < 255){
+	      // See comment for coefficient > 0.
+	      if (row_arr[y][col_offset + x] < 254){
 		++row_arr[y][col_offset + x];
 		min_diff += coefficient;
 	      }
