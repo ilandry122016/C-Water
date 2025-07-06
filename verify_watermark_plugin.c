@@ -282,10 +282,6 @@ verify_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_li
 	gimp_progress_update ((gdouble) (i - y1) / (gdouble) (y2 - y1));
     }
 
-  for (i = 0; i < 100; ++i){
-    printf("bits: %d %.2x \n", i, original_bits[i]); 
-  }
-
    // Finalize the hash. BLAKE3_OUT_LEN is the default output length, 32 bytes.
   uint8_t blake3_hash[BLAKE3_OUT_LEN];
   blake3_hasher_finalize(&hasher, blake3_hash, BLAKE3_OUT_LEN);

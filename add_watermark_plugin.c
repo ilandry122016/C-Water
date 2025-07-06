@@ -302,10 +302,6 @@ add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit
   memcpy(new_bits + BLAKE3_OUT_LEN + current_len, original_bits + BLAKE3_OUT_LEN + current_len,
 	 original_bits_size - BLAKE3_OUT_LEN - current_len);
 
-  for (i = 0; i < 100; ++i){
-    printf("bits: %d %.2x \n", i, new_bits[i]); 
-  }
-
   // Based on values with the following equation:
   // 0.5 * cos((2 * x + 1) * u * M_PI / 16)
   // with u = 6, and x = 0,1,...,7
@@ -391,13 +387,6 @@ add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit
 	 
 	double min_diff = DCT_float_val - new_value - 1 + cushion;
 	
-	if (col_offset == 6 * 8 && y_block == 0){
-	  printf("00: %d %d %d %d %d %d %d %g %g %g %d %g \n", x_block, y_block, block_index,
-		 original_bit_index, sub_block_index, new_value, DCT_value,
-		 DCT_float_val, G_matrix_val[encode_u][encode_v], min_diff,
-		 ((int)(floor(G_matrix_val[encode_u][encode_v])) & 3),  G_matrix_val[encode_u][encode_v] - floor(G_matrix_val[encode_u][encode_v]));
-	}
-
 	for (x = 0; x <= 7 && min_diff > 0; ++x){
 	  for (y = 0; y <= 7 && min_diff > 0; ++y){
 	    double coefficient = cos_arr[x] * cos_arr[y];
@@ -424,7 +413,6 @@ add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit
 		    * cos((2 * xx + 1) * u * M_PI / 16) * cos((2 * yy + 1) * v * M_PI / 16);
 		}
 	      }
-	      printf("G_6_6: %g %g %g %d \n", G_6_6, min_diff, coefficient, ((int)(floor(G_6_6)) & 3));
 	    }
 	  }
 	}
