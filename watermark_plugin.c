@@ -1,6 +1,5 @@
 #include <libgimp/gimp.h>
 #include <libgimp/gimpui.h>
-// #include <jbig85.h>
 #include <jbig.h>
 #include "blake3.h"
 #include <errno.h>
