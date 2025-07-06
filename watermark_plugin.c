@@ -25,7 +25,7 @@ void gimp_pixel_rgn_set_row (GimpPixelRgn *pr,
 			     gint y,
 			     gint width);
 
-static void watermark (GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, gint lower_limit_y, gint upper_limit_x, gint upper_limit_y, gint channels);
+static void add_watermark (GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, gint lower_limit_y, gint upper_limit_x, gint upper_limit_y, gint channels);
 
 // global variables
 unsigned char compressed_data[1000];
@@ -70,7 +70,7 @@ MAIN()
   GimpRunMode       run_mode;
   GimpDrawable     *drawable;
 	
-  gimp_ui_init("mywatermark", FALSE);
+  gimp_ui_init("addwatermark", FALSE);
   GtkWidget *main_vbox;
   main_vbox = gtk_vbox_new (FALSE, 6);
   gtk_widget_show (main_vbox);
@@ -89,7 +89,7 @@ MAIN()
   /*  Get the specified drawable  */
   drawable = gimp_drawable_get (param[2].data.d_drawable);
 	
-  gimp_progress_init ("My Watermark...");
+  gimp_progress_init ("Add Watermark...");
 
   gint x1, y1, x2, y2;
 	
@@ -101,7 +101,7 @@ MAIN()
   gint channels = gimp_drawable_bpp (drawable->drawable_id);
   pixels_to_change = g_new(guchar, channels * (x2 - x1) * (y2 - y1));
 
-  watermark (drawable, pixels_to_change, x1, x2, y1, y2, channels);
+  add_watermark (drawable, pixels_to_change, x1, x2, y1, y2, channels);
 
   gimp_displays_flush ();
   gimp_drawable_detach (drawable);
@@ -131,24 +131,24 @@ query (void)
   };
 
   gimp_install_procedure (
-			  "plug-in-my-watermark",
-			  "my-watermark",
-			  "Displays \"My watermark\" in a dialog",
+			  "plug-in-add-watermark",
+			  "add-watermark",
+			  "Displays \"Add watermark\" in a dialog",
 			  "Isaac Landry",
 			  "Copyright Isaac Landry",
 			  "2004",
-			  "_My watermark...",
+			  "_Add watermark...",
 			  "RGB*, GRAY*",
 			  GIMP_PLUGIN,
 			  G_N_ELEMENTS (args), 0,
 			  args, NULL);
 
-  gimp_plugin_menu_register ("plug-in-my-watermark",
+  gimp_plugin_menu_register ("plug-in-add-watermark",
 			     "<Image>/Filters/Misc");
 }
 
 static void
-watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, gint lower_limit_y, gint upper_limit_x, gint upper_limit_y, gint channels)
+add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, gint lower_limit_y, gint upper_limit_x, gint upper_limit_y, gint channels)
 {
   gint         i, j, k;
   
