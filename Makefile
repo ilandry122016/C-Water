@@ -9,3 +9,6 @@ verify_watermark: verify_watermark_plugin.c
 
 blake3_test: blake3_test.c
 	gcc blake3_test.c -o blake3_test -I /home/isaac/Documents/C++/BLAKE3_install/include/ -L /home/isaac/Documents/C++/BLAKE3_install/lib/ -lblake3
+
+biggest_range: biggest_range.cpp
+	g++ -O3 biggest_range.cpp -o biggest_range -Wall -Wextra
