@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdbool.h>
 
 static void query (void);
 static void run (const gchar *name,
@@ -374,12 +375,15 @@ add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit
 	if (new_value > DCT_value){
 	  DCT_value += 4;
 	}
-	
-	double DCT_float_val = DCT_value + G_matrix_val[encode_u][encode_v] - floor(G_matrix_val[encode_u][encode_v]);
+
+	double fractional = G_matrix_val[encode_u][encode_v] - floor(G_matrix_val[encode_u][encode_v]);;
+	double DCT_float_val = DCT_value + fractional;
 	double cushion = 0.001;
-	 
-	double min_diff = DCT_float_val - new_value - 1 + cushion;
-		
+		 
+	// double min_diff = DCT_float_val - new_value - 1 + cushion;
+	double min_diff = DCT_value - new_value;
+	bool overflow = false;
+	
 	for (x = 0; x <= 7 && min_diff > 0; ++x){
 	  for (y = 0; y <= 7 && min_diff > 0; ++y){
 	    double coefficient = cos_arr[x] * cos_arr[y];
@@ -389,31 +393,35 @@ add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit
 	      // the edge case of trying to subtract from 0 or add to
 	      // 255.
 	      if (row_arr[y][col_offset + x] > 1){
-		--row_arr[y][col_offset + x];
 		min_diff -= coefficient;
+		if (min_diff < 0 && min_diff + fractional < cushion){
+		  overflow = true;
+		  printf("plus: %d %d %g %g %g %g \n", x, y, min_diff, fractional, cushion, coefficient);
+		}
+		else{
+		  --row_arr[y][col_offset + x];
+		}
 	      }
 	    }
 	    else{
 	      // See comment for coefficient > 0.
 	      if (row_arr[y][col_offset + x] < 254){
-		++row_arr[y][col_offset + x];
 		min_diff += coefficient;
-	      }
-	    }
-
-	    if (col_offset == 6 * 8 && y_block == 0){
-	      double G_6_6 = 0;
-	      const int u = 6;
-	      const int v = 6;
-	      for (int xx = 0; xx <= 7; ++xx){
-		for (int yy = 0; yy <= 7; ++yy){
-		  G_6_6 += (1.0/4) * alpha(u) * alpha(v) * (row_arr[yy][col_offset + xx] - offset)
-		    * cos((2 * xx + 1) * u * M_PI / 16) * cos((2 * yy + 1) * v * M_PI / 16);
+		if (min_diff < 0 && min_diff + fractional < cushion){
+		  overflow = true;
+		  printf("minus: %d %d %g %g %g %g \n", x, y, min_diff, fractional, cushion, coefficient);
+		}
+		else{
+		  ++row_arr[y][col_offset + x];
 		}
 	      }
 	    }
 	  }
 	}
+	if (overflow){
+	  printf("overflow: %d %d \n", x_block, y_block);
+	}
+
       }      
 
       for (k = 0; k < 8; ++k){
