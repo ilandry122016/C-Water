@@ -307,6 +307,11 @@ add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit
 		       0.461939766255643,
 		       -0.461939766255643,
 		       0.19134171618254};
+
+  // Computed from biggest_range.cpp. This is the number that is
+  // farthest from any result (3.87250035771558e-06 / 2) from the
+  // cosine transform for the 6,6 coefficient.
+  double cutoff = 0.016098061247547;
   
   for (i = y1; i < y2; i += 8)
     {
@@ -370,13 +375,13 @@ add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit
 	int new_value = (new_bits[original_bit_index] >> (sub_block_index * 2)) & 3;
 	// We change values of the original image such that the DCT changes to what we want.
 	// Get the lowest 2 integer bits of G[6][6].
-	int DCT_value = (int)(floor(G_matrix_val[encode_u][encode_v])) & 3;
+	int DCT_value = (int)(floor(G_matrix_val[encode_u][encode_v] - cutoff)) & 3;
 	
 	if (new_value > DCT_value){
 	  DCT_value += 4;
 	}
 
-	double fractional = G_matrix_val[encode_u][encode_v] - floor(G_matrix_val[encode_u][encode_v]);;
+	double fractional = G_matrix_val[encode_u][encode_v] - cutoff - floor(G_matrix_val[encode_u][encode_v] - cutoff);
 	double DCT_float_val = DCT_value + fractional;
 	double cushion = 0.001;
 		 
