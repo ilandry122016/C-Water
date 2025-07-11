@@ -29,7 +29,7 @@ void gimp_pixel_rgn_set_row (GimpPixelRgn *pr,
 static void add_watermark (GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, gint lower_limit_y, gint upper_limit_x, gint upper_limit_y, gint channels);
 
 // global variables
-unsigned char compressed_data[1000];
+unsigned char compressed_data[10000];
 size_t current_len = 0;
 
 // helper function
@@ -243,32 +243,30 @@ add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit
 	blake3_hasher_update(&hasher, row_arr[j], channels * (x2 - x1));
       }
 
-      // Create A DCT matrix for the rows.
       // Break up into 8x8 subblocks of pixels
       
       for (gint col_offset = 0; col_offset < channels * (x2 - x1); col_offset += 8){
-	for (u = 0; u < 8; ++u){ // u is the coordinate for the row_arr
-	  for (v = 0; v <  8; ++v){
-	    G_matrix_val[u][v] = 0;
-		
-	    for (x = 0; x <= 7; ++x){
-	      for (y = 0; y <= 7; ++y){
-		G_matrix_val[u][v] += (1.0/4) * alpha(u) * alpha(v) * (row_arr[y][col_offset + x] - offset)
-		  * cos((2 * x + 1) * u * M_PI / 16) * cos((2 * y + 1) * v * M_PI / 16);
-	      }
-	    }
-	  }
-	}
-			
 	int x_block = col_offset / 8;
 	int y_block = (i - y1) / 8;
 	int block_index = x_block + y_block * channels * width / 8;
 	int original_bit_index = block_index / 4;
 	int sub_block_index = block_index & 3;
 
-	// Get the lowest 2 integer bits of G[6][6].
-	int DCT_value = (int)(G_matrix_val[encode_u][encode_v]) & 3;
-	original_bits[original_bit_index] = original_bits[original_bit_index] | (DCT_value << (sub_block_index * 2));
+	const int x_bit_1_p_alpha_index = 0;
+	const int y_bit_1_p_alpha_index = 0;
+
+	const int x_bit_alpha_index = 1;
+	const int y_bit_alpha_index = 0;
+
+	// Get the lowest 2 integer bits of the pixels.
+	int bit_1_p_alpha = (row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset] & 1);
+	int bit_alpha = (row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset] & 1);
+      
+	int orig_value = bit_1_p_alpha + 2 * bit_alpha;
+	/* printf("orig_value: %d %d %d %d %d %d %d %d %d \n", */
+	/*        orig_value, original_bit_index, original_bits_size, */
+	/*        x_block, y_block, block_index, x1, x2, channels); */
+	original_bits[original_bit_index] = original_bits[original_bit_index] | (orig_value << (sub_block_index * 2));
 	     
       }      
 
@@ -288,6 +286,8 @@ add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit
   jbg_enc_out(&se);                                    /* encode image */
   jbg_enc_free(&se);                    /* release allocated resources */
 
+  printf("current_len: %d \n", current_len);
+  
   guchar* new_bits = g_new(guchar, original_bits_size);
 
   memcpy(new_bits, blake3_hash, BLAKE3_OUT_LEN);
@@ -295,23 +295,6 @@ add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit
   // Keep all the rest of the bits the same.
   memcpy(new_bits + BLAKE3_OUT_LEN + current_len, original_bits + BLAKE3_OUT_LEN + current_len,
 	 original_bits_size - BLAKE3_OUT_LEN - current_len);
-
-  // Based on values with the following equation:
-  // 0.5 * cos((2 * x + 1) * u * M_PI / 16)
-  // with u = 6, and x = 0,1,...,7
-  double cos_arr[8] = {0.191341716182545,
-		       -0.461939766255643,
-		       0.461939766255643,
-		       -0.191341716182545,
-		       -0.191341716182545,
-		       0.461939766255643,
-		       -0.461939766255643,
-		       0.19134171618254};
-
-  // Computed from biggest_range.cpp. This is the number that is
-  // farthest from any result (3.87250035771558e-06 / 2) from the
-  // cosine transform for the 6,6 coefficient.
-  double cutoff = 0.016098061247547;
   
   for (i = y1; i < y2; i += 8)
     {
@@ -350,84 +333,32 @@ add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit
                               x2 - x1);
 
       
-      // Break up into 8x8 subblocks of pixels      
+      // Break up into 8x8 subblocks of pixels
       for (gint col_offset = 0; col_offset < channels * (x2 - x1); col_offset += 8){
-	// Create A DCT matrix for the 8x8 block.
-	for (u = 0; u < 8; ++u){ // u is the coordinate for the row_arr
-	  for (v = 0; v <  8; ++v){
-	    G_matrix_val[u][v] = 0;
-		
-	    for (x = 0; x <= 7; ++x){
-	      for (y = 0; y <= 7; ++y){
-		G_matrix_val[u][v] += (1.0/4) * alpha(u) * alpha(v) * (row_arr[y][col_offset + x] - offset)
-		  * cos((2 * x + 1) * u * M_PI / 16) * cos((2 * y + 1) * v * M_PI / 16);
-	      }
-	    }
-	  }
-	}
-			
-	int x_block = col_offset / 8;
+        int x_block = col_offset / 8;
 	int y_block = (i - y1) / 8;
 	int block_index = x_block + y_block * channels * width / 8;
 	int original_bit_index = block_index / 4;
 	int sub_block_index = block_index & 3;
 
+	const int x_bit_1_p_alpha_index = 0;
+	const int y_bit_1_p_alpha_index = 0;
+
+	const int x_bit_alpha_index = 1;
+	const int y_bit_alpha_index = 0;
+
+	// Get the lowest 2 integer bits of the pixels.
 	int new_value = (new_bits[original_bit_index] >> (sub_block_index * 2)) & 3;
-	// We change values of the original image such that the DCT changes to what we want.
-	// Get the lowest 2 integer bits of G[6][6].
-	int DCT_value = (int)(floor(G_matrix_val[encode_u][encode_v] - cutoff)) & 3;
-	
-	if (new_value > DCT_value){
-	  DCT_value += 4;
-	}
 
-	double fractional = G_matrix_val[encode_u][encode_v] - cutoff - floor(G_matrix_val[encode_u][encode_v] - cutoff);
-	double DCT_float_val = DCT_value + fractional;
-	double cushion = 0.001;
-		 
-	// double min_diff = DCT_float_val - new_value - 1 + cushion;
-	double min_diff = DCT_value - new_value;
-	bool overflow = false;
-	
-	for (x = 0; x <= 7 && min_diff > 0; ++x){
-	  for (y = 0; y <= 7 && min_diff > 0; ++y){
-	    double coefficient = cos_arr[x] * cos_arr[y];
-	    if (coefficient > 0){
-	      // Do not modify values if it is 0 or 1. Then we know
-	      // that if we see a 0, don't modify it. This clarifies
-	      // the edge case of trying to subtract from 0 or add to
-	      // 255.
-	      if (row_arr[y][col_offset + x] > 1){
-		min_diff -= coefficient;
-		if (min_diff < 0 && min_diff + fractional < cushion){
-		  overflow = true;
-		  printf("plus: %d %d %g %g %g %g \n", x, y, min_diff, fractional, cushion, coefficient);
-		}
-		else{
-		  --row_arr[y][col_offset + x];
-		}
-	      }
-	    }
-	    else{
-	      // See comment for coefficient > 0.
-	      if (row_arr[y][col_offset + x] < 254){
-		min_diff += coefficient;
-		if (min_diff < 0 && min_diff + fractional < cushion){
-		  overflow = true;
-		  printf("minus: %d %d %g %g %g %g \n", x, y, min_diff, fractional, cushion, coefficient);
-		}
-		else{
-		  ++row_arr[y][col_offset + x];
-		}
-	      }
-	    }
-	  }
-	}
-	if (overflow){
-	  printf("overflow: %d %d \n", x_block, y_block);
-	}
+	int bit_1_p_alpha = (0xfe | (new_value & 1));
+	int bit_alpha = (0xfe  | (new_value / 2));
 
-      }      
+	row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset] =
+	  (row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset] & bit_1_p_alpha);
+
+	row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset] =
+	  (row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset] & bit_alpha);
+      }
 
       for (k = 0; k < 8; ++k){
 	
@@ -435,13 +366,11 @@ add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit
 				row_arr[k],
 				x1, i + k,
 				x2 - x1);
-      }    
+      }
       
       if (i % 10 == 0)
 	gimp_progress_update ((gdouble) (i - y1) / (gdouble) (y2 - y1));
     }
-
-  
 
   for (i = 0; i < 8; ++i){
     g_free(row_arr[i]);
