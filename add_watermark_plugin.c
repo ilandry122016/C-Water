@@ -32,14 +32,6 @@ static void add_watermark (GimpDrawable *drawable, guchar *pixels_to_change, gin
 unsigned char compressed_data[10000];
 size_t current_len = 0;
 
-// helper function
-static double alpha(gint i){
-  if (i == 0){
-    return 1.0/sqrt(2);
-  }
-  return 1;
-}
-
 void output_bie(unsigned char *start, size_t len, void *file)
 {
   for (int i = 0; i < len; ++i){
@@ -167,9 +159,6 @@ add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit
   int encode_v = 6;
 
   guchar* row_arr[8];
-  double G_matrix_val[8][8]; // The matrix fot the DCT (Discrete Cosine Transform)
-  double G_prime_matrix_val[8][8];
-  double G_matrix_inverse_val[8][8];
   int offset = 128; // To map the values from 0-255 to -128-127
   guchar* original_bits;
   
@@ -263,11 +252,7 @@ add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit
 	int bit_alpha = (row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset] & 1);
       
 	int orig_value = bit_1_p_alpha + 2 * bit_alpha;
-	/* printf("orig_value: %d %d %d %d %d %d %d %d %d \n", */
-	/*        orig_value, original_bit_index, original_bits_size, */
-	/*        x_block, y_block, block_index, x1, x2, channels); */
 	original_bits[original_bit_index] = original_bits[original_bit_index] | (orig_value << (sub_block_index * 2));
-	     
       }      
 
       if (i % 10 == 0)
@@ -278,6 +263,12 @@ add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit
   uint8_t blake3_hash[BLAKE3_OUT_LEN];
   blake3_hasher_finalize(&hasher, blake3_hash, BLAKE3_OUT_LEN);
 
+  printf("blake3_hash: ");
+  for (i = 0; i < BLAKE3_OUT_LEN; ++i){
+    printf("%.2x ", blake3_hash[i]);
+  }
+  printf("\n");
+
   unsigned char *bitmaps[1] = {original_bits};
   struct jbg_enc_state se;
  
@@ -287,6 +278,7 @@ add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit
   jbg_enc_free(&se);                    /* release allocated resources */
 
   printf("current_len: %d \n", current_len);
+  printf("original_bits_size: %d \n", original_bits_size);
   
   guchar* new_bits = g_new(guchar, original_bits_size);
 
@@ -350,14 +342,28 @@ add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit
 	// Get the lowest 2 integer bits of the pixels.
 	int new_value = (new_bits[original_bit_index] >> (sub_block_index * 2)) & 3;
 
-	int bit_1_p_alpha = (0xfe | (new_value & 1));
-	int bit_alpha = (0xfe  | (new_value / 2));
+	int bit_1_p_alpha = (new_value & 1);
+	int bit_alpha = (new_value / 2);
 
+	int row_1_p_alpha = row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset]
+	  - (row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset] % 2);
+	
+	int row_alpha = row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset]
+	  - (row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset] % 2);
+	
 	row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset] =
-	  (row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset] & bit_1_p_alpha);
+	  (row_1_p_alpha + bit_1_p_alpha);
 
 	row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset] =
-	  (row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset] & bit_alpha);
+	  (row_alpha + bit_alpha);
+
+	if (col_offset == 0 && i == 0){
+	  printf("col_offset loop values: %d %d %d %d %d %d %d %d %d %d \n", x_block,
+		 y_block, block_index, original_bit_index, sub_block_index,
+		 new_value, bit_1_p_alpha, bit_alpha,
+		 (int)(row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset]),
+		 (int)(row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset]));
+	}
       }
 
       for (k = 0; k < 8; ++k){
