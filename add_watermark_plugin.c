@@ -356,18 +356,9 @@ add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit
 
 	row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset] =
 	  (row_alpha + bit_alpha);
-
-	if (col_offset == 0 && i == 0){
-	  printf("col_offset loop values: %d %d %d %d %d %d %d %d %d %d \n", x_block,
-		 y_block, block_index, original_bit_index, sub_block_index,
-		 new_value, bit_1_p_alpha, bit_alpha,
-		 (int)(row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset]),
-		 (int)(row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset]));
-	}
       }
 
       for (k = 0; k < 8; ++k){
-	
 	gimp_pixel_rgn_set_row (&rgn_out,
 				row_arr[k],
 				x1, i + k,
