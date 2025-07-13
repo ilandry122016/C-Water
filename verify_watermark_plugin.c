@@ -28,7 +28,7 @@ void gimp_pixel_rgn_set_row (GimpPixelRgn *pr,
 static void verify_watermark (GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, gint lower_limit_y, gint upper_limit_x, gint upper_limit_y, gint channels);
 
 // global variables
-unsigned char compressed_data[1000];
+unsigned char compressed_data[10000];
 size_t current_len = 0;
 
 // helper function
@@ -37,16 +37,6 @@ static double alpha(gint i){
     return 1.0/sqrt(2);
   }
   return 1;
-}
-
-void output_bie(unsigned char *start, size_t len, void *file)
-{
-  for (int i = 0; i < len; ++i){
-    compressed_data[current_len + i] = start[i];
-  }
-  current_len += len;
-  
-  return;
 }
 
 GimpPlugInInfo PLUG_IN_INFO = {
@@ -196,8 +186,6 @@ verify_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_li
   size_t original_bits_size = channels * (width / 8) * (height / 8 ) / 4;
   original_bits = g_new(guchar, original_bits_size); // We need 2 bits per 8x8 block. One is for the signal, and the other is for the modulator.
 
-  gint max_difference = 0;
-
   for (i = y1; i < y2; i += 8)
     {
       /* Get row i through i+7 */
@@ -234,10 +222,100 @@ verify_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_li
                               x1, MIN (y2 - 1, i + 7),
                               x2 - x1);
 
-      // Create A DCT matrix for the rows.
       // Break up into 8x8 subblocks of pixels
       
       for (gint col_offset = 0; col_offset < channels * (x2 - x1); col_offset += 8){
+	int x_block = col_offset / 8;
+	int y_block = (i - y1) / 8;
+	int block_index = x_block + y_block * channels * width / 8;
+	int original_bit_index = block_index / 4;
+	int sub_block_index = block_index & 3;
+
+	const int x_bit_1_p_alpha_index = 0;
+	const int y_bit_1_p_alpha_index = 0;
+
+	const int x_bit_alpha_index = 1;
+	const int y_bit_alpha_index = 0;
+
+	// Get the lowest 2 integer bits of the pixels.
+	int bit_1_p_alpha = (row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset] & 1);
+	int bit_alpha = (row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset] & 1);
+      
+	int orig_value = bit_1_p_alpha + 2 * bit_alpha;
+	original_bits[original_bit_index] = original_bits[original_bit_index] | (orig_value << (sub_block_index * 2));    
+      }      
+
+      if (i % 10 == 0)
+	gimp_progress_update ((gdouble) (i - y1) / (gdouble) (y2 - y1));
+    }
+
+  unsigned char *bitmaps[1] = {original_bits};
+ 
+  struct jbg_dec_state sd;
+  
+  jbg_dec_init(&sd);
+  size_t dec_offset;
+  jbg_dec_in(&sd, original_bits + BLAKE3_OUT_LEN, original_bits_size - BLAKE3_OUT_LEN, &dec_offset);
+  printf("offset: %d \n", dec_offset);
+  
+  printf("crash point 1\n");
+  int number_of_planes = jbg_dec_getplanes(&sd);
+  printf("crash point 2\n");
+  unsigned char* result_bitmap = jbg_dec_getimage(&sd, 0);
+  printf("crash point 3\n");
+  long result_size = jbg_dec_getsize(&sd);
+
+  printf("Result size: %d \n", result_size);
+  printf("Width: %d \n", jbg_dec_getwidth(&sd));
+  printf("Height: %d \n", jbg_dec_getheight(&sd));
+
+  printf("original_bit_size: %d \n", original_bits_size);
+
+  printf("blake3_hash: ");
+  for (i = 0; i < BLAKE3_OUT_LEN; ++i){
+    printf("%.2x ", original_bits[i]);
+  }
+  printf("\n");
+  
+  for (i = y1; i < y2; i += 8)
+    {
+      /* Get row i through i+7 */
+      gimp_pixel_rgn_get_row (&rgn_in,
+                              row_arr[0],
+                              x1, i,
+                              x2 - x1);
+      gimp_pixel_rgn_get_row (&rgn_in,
+                              row_arr[1],
+                              x1, MIN (y2 - 1, i + 1),
+                              x2 - x1);
+      gimp_pixel_rgn_get_row (&rgn_in,
+			      row_arr[2],
+                              x1, MIN (y2 - 1, i + 2),
+                              x2 - x1);
+      gimp_pixel_rgn_get_row (&rgn_in,
+			      row_arr[3],
+                              x1, MIN (y2 - 1, i + 3),
+                              x2 - x1);
+      gimp_pixel_rgn_get_row (&rgn_in,
+			      row_arr[4],
+                              x1, MIN (y2 - 1, i + 4),
+                              x2 - x1);
+      gimp_pixel_rgn_get_row (&rgn_in,
+			      row_arr[5],
+                              x1, MIN (y2 - 1, i + 5),
+                              x2 - x1);
+      gimp_pixel_rgn_get_row (&rgn_in,
+			      row_arr[6],
+                              x1, MIN (y2 - 1, i + 6),
+                              x2 - x1);
+      gimp_pixel_rgn_get_row (&rgn_in,
+                              row_arr[7],
+                              x1, MIN (y2 - 1, i + 7),
+                              x2 - x1);
+
+      // Break up into 8x8 subblocks of pixels
+      for (gint col_offset = 0; col_offset < channels * (x2 - x1); col_offset += 8){
+	// Create A DCT matrix for the 8x8 block.
 	for (u = 0; u < 8; ++u){ // u is the coordinate for the row_arr
 	  for (v = 0; v <  8; ++v){
 	    G_matrix_val[u][v] = 0;
@@ -257,139 +335,63 @@ verify_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_li
 	int original_bit_index = block_index / 4;
 	int sub_block_index = block_index & 3;
 
+	// int new_value = (new_bits[original_bit_index] >> (sub_block_index * 2)) & 3;
+	int new_value = 0;
+	// We change values of the original image such that the DCT changes to what we want.
 	// Get the lowest 2 integer bits of G[6][6].
 	int DCT_value = (int)(floor(G_matrix_val[encode_u][encode_v])) & 3;
-	original_bits[original_bit_index] = original_bits[original_bit_index] | (DCT_value << (sub_block_index * 2));
-	     
-      }      
+	 
+	if (new_value > DCT_value){
+	  DCT_value += 4;
+	}
+	
+	double DCT_float_val = DCT_value + remainder(G_matrix_val[encode_u][encode_v], 1.0);
+	double cushion = 0.001;
+	 
+	double min_diff = DCT_float_val - new_value - 1 + cushion;
+	for (x = 0; x <= 7 && min_diff > 0; ++x){
+	  for (y = 0; y <= 7 && min_diff > 0; ++y){
+	    // double coefficient = cos_arr[x] * cos_arr[y];
+	    double coefficient = 0;
+	    if (coefficient > 0){
+	      if (row_arr[y][col_offset + x] > 0){
+		--row_arr[y][col_offset + x];
+		min_diff -= coefficient;
+	      }
+	    }
+	    else{
+	      if (row_arr[y][col_offset + x] < 255){
+		++row_arr[y][col_offset + x];
+		min_diff += coefficient;
+	      }
+	    }
+	  }
+	}
+      }
 
+       for (k = 0; k < 8; ++k){
+	 gimp_pixel_rgn_set_row (&rgn_out,
+				row_arr[k],
+				x1, i + k,
+				x2 - x1);
+       }
+      
       if (i % 10 == 0)
 	gimp_progress_update ((gdouble) (i - y1) / (gdouble) (y2 - y1));
     }
-
-  unsigned char *bitmaps[1] = {original_bits};
- 
-  struct jbg_dec_state sd;
-  
-  jbg_dec_init(&sd);
-  size_t dec_offset;
-  jbg_dec_in(&sd, original_bits + BLAKE3_OUT_LEN, original_bits_size - BLAKE3_OUT_LEN, &dec_offset);
-  printf("offset: %d \n", dec_offset);
-
-  int number_of_planes = jbg_dec_getplanes(&sd);
-  unsigned char* result_bitmap = jbg_dec_getimage(&sd, 0);
-  long result_size = jbg_dec_getsize(&sd);
-
-  printf("Result size: %d \n", result_size);
-  printf("Width: %d \n", jbg_dec_getwidth(&sd));
-  printf("Height: %d \n", jbg_dec_getheight(&sd));
-  
-  /* for (i = y1; i < y2; i += 8) */
-  /*   { */
-  /*     /\* Get row i through i+7 *\/ */
-  /*     gimp_pixel_rgn_get_row (&rgn_in, */
-  /*                             row_arr[0], */
-  /*                             x1, i, */
-  /*                             x2 - x1); */
-  /*     gimp_pixel_rgn_get_row (&rgn_in, */
-  /*                             row_arr[1], */
-  /*                             x1, MIN (y2 - 1, i + 1), */
-  /*                             x2 - x1); */
-  /*     gimp_pixel_rgn_get_row (&rgn_in, */
-  /* 			      row_arr[2], */
-  /*                             x1, MIN (y2 - 1, i + 2), */
-  /*                             x2 - x1); */
-  /*     gimp_pixel_rgn_get_row (&rgn_in, */
-  /* 			      row_arr[3], */
-  /*                             x1, MIN (y2 - 1, i + 3), */
-  /*                             x2 - x1); */
-  /*     gimp_pixel_rgn_get_row (&rgn_in, */
-  /* 			      row_arr[4], */
-  /*                             x1, MIN (y2 - 1, i + 4), */
-  /*                             x2 - x1); */
-  /*     gimp_pixel_rgn_get_row (&rgn_in, */
-  /* 			      row_arr[5], */
-  /*                             x1, MIN (y2 - 1, i + 5), */
-  /*                             x2 - x1); */
-  /*     gimp_pixel_rgn_get_row (&rgn_in, */
-  /* 			      row_arr[6], */
-  /*                             x1, MIN (y2 - 1, i + 6), */
-  /*                             x2 - x1); */
-  /*     gimp_pixel_rgn_get_row (&rgn_in, */
-  /*                             row_arr[7], */
-  /*                             x1, MIN (y2 - 1, i + 7), */
-  /*                             x2 - x1); */
-
-  /*     // Break up into 8x8 subblocks of pixels       */
-  /*     for (gint col_offset = 0; col_offset < channels * (x2 - x1); col_offset += 8){ */
-  /* 	// Create A DCT matrix for the 8x8 block. */
-  /* 	for (u = 0; u < 8; ++u){ // u is the coordinate for the row_arr */
-  /* 	  for (v = 0; v <  8; ++v){ */
-  /* 	    G_matrix_val[u][v] = 0; */
-		
-  /* 	    for (x = 0; x <= 7; ++x){ */
-  /* 	      for (y = 0; y <= 7; ++y){ */
-  /* 		G_matrix_val[u][v] += (1.0/4) * alpha(u) * alpha(v) * (row_arr[y][col_offset + x] - offset) */
-  /* 		  * cos((2 * x + 1) * u * M_PI / 16) * cos((2 * y + 1) * v * M_PI / 16); */
-  /* 	      } */
-  /* 	    } */
-  /* 	  } */
-  /* 	} */
-			
-  /* 	int x_block = col_offset / 8; */
-  /* 	int y_block = (i - y1) / 8; */
-  /* 	int block_index = x_block + y_block * channels * width / 8; */
-  /* 	int original_bit_index = block_index / 4; */
-  /* 	int sub_block_index = block_index & 3; */
-
-  /* 	int new_value = (new_bits[original_bit_index] >> (sub_block_index * 2)) & 3; */
-  /* 	// We change values of the original image such that the DCT changes to what we want. */
-  /* 	// Get the lowest 2 integer bits of G[6][6]. */
-  /* 	int DCT_value = (int)(floor(G_matrix_val[encode_u][encode_v])) & 3; */
-	 
-  /* 	if (new_value > DCT_value){ */
-  /* 	  DCT_value += 4; */
-  /* 	} */
-	
-  /* 	double DCT_float_val = DCT_value + remainder(G_matrix_val[encode_u][encode_v], 1.0); */
-  /* 	double cushion = 0.001; */
-	 
-  /* 	double min_diff = DCT_float_val - new_value - 1 + cushion; */
-  /* 	for (x = 0; x <= 7 && min_diff > 0; ++x){ */
-  /* 	  for (y = 0; y <= 7 && min_diff > 0; ++y){ */
-  /* 	    double coefficient = cos_arr[x] * cos_arr[y]; */
-  /* 	    if (coefficient > 0){ */
-  /* 	      if (row_arr[y][col_offset + x] > 0){ */
-  /* 		--row_arr[y][col_offset + x]; */
-  /* 		min_diff -= coefficient; */
-  /* 	      } */
-  /* 	    } */
-  /* 	    else{ */
-  /* 	      if (row_arr[y][col_offset + x] < 255){ */
-  /* 		++row_arr[y][col_offset + x]; */
-  /* 		min_diff += coefficient; */
-  /* 	      } */
-  /* 	    } */
-  /* 	  } */
-  /* 	} */
-  /*     }       */
-
-  /*      for (k = 0; k < 8; ++k){ */
-  /* 	 gimp_pixel_rgn_set_row (&rgn_out, */
-  /* 				row_arr[k], */
-  /* 				x1, i + k, */
-  /* 				x2 - x1); */
-  /*      }     */
-      
-  /*     if (i % 10 == 0) */
-  /* 	gimp_progress_update ((gdouble) (i - y1) / (gdouble) (y2 - y1)); */
-  /*   } */
 
   
 
   for (i = 0; i < 8; ++i){
     g_free(row_arr[i]);
   }
+
+  /* gimp_pixel_rgn_set_row(&rgn_out, */
+  /* 			 original_bits[1], */
+  /* 			 x1, 1, */
+  /* 			 x2 - x1); */
+
+  printf("Assertion point.\n");
 
   gimp_drawable_flush (drawable);
   gimp_drawable_merge_shadow (drawable->drawable_id, TRUE);
