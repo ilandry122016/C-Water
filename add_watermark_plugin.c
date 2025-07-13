@@ -384,12 +384,10 @@ add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit
 	int bit_alpha = (new_value / 2);
 
 	// The 1_p_alpha pixel with the lowest bit set to 0.
-	int row_1_p_alpha = row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset]
-	  - (row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset] % 2);
+	int row_1_p_alpha = (row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset] & 0xfe);
 
 	// The alpha pixel with the lowest bit set to 0.
-	int row_alpha = row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset]
-	  - (row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset] % 2);
+	int row_alpha = (row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset] & 0xfe);
 
 	// Add the new bit value to the 1_p_alpha pixel.
 	row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset] =
