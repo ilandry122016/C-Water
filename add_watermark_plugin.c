@@ -289,6 +289,7 @@ add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit
   printf("original_bits_size: %d \n", original_bits_size);
   
   guchar* new_bits = g_new(guchar, original_bits_size);
+  // guchar is maybe unsigned char?
 
   // The watermark is the hash of all pixels in the image and the bits
   // before modification used for watermarking in a compressed form.
@@ -343,33 +344,58 @@ add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit
       
       // Break up into 8x8 subblocks of pixels
       for (gint col_offset = 0; col_offset < channels * (x2 - x1); col_offset += 8){
-        int x_block = col_offset / 8;
-	int y_block = (i - y1) / 8;
-	int block_index = x_block + y_block * channels * width / 8;
+        int x_block = col_offset / 8; // the column index of each block.
+	int y_block = (i - y1) / 8; // the row index of each block
+	int block_index = x_block + y_block * channels * width / 8; // there are channel * width / 8 blocks per row.
+
+	// 2 bits per block are used. Gives the byte for the block.
 	int original_bit_index = block_index / 4;
+
+	// Gives the bits within the byte for this block.
 	int sub_block_index = block_index & 3;
 
+	// 1_p_alpha means 1 + alpha
+	// TODO: Hardcode which pixels to change. This should be fixed
+	// to use the hash to choose which pixels.
 	const int x_bit_1_p_alpha_index = 0;
 	const int y_bit_1_p_alpha_index = 0;
 
 	const int x_bit_alpha_index = 1;
 	const int y_bit_alpha_index = 0;
 
-	// Get the lowest 2 integer bits of the pixels.
+	// Get the bits that we'll be setting.
+	//
+	// Get the byte with new_bits[original_index].
+	//
+	// Shift the byte so that the two bits we want are all the way
+	// to the right with ">> (sub_block_index * 2))" (we multiply
+	// sub_block_index by 2 because there are 2 bits per block.
+	//
+	// We use "& 3" to select the lowest two bits because other
+	// bits are for other blocks.
 	int new_value = (new_bits[original_bit_index] >> (sub_block_index * 2)) & 3;
 
+	// Select the new values of the bits for each pixel.
+	//
+	// new_value has two bits. "&" it with 1 to get the lowest
+	// bit. divide by 2 to get the next bit.
+	// The order is arbitrary.
 	int bit_1_p_alpha = (new_value & 1);
 	int bit_alpha = (new_value / 2);
 
+	// The 1_p_alpha pixel with the lowest bit set to 0.
 	int row_1_p_alpha = row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset]
 	  - (row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset] % 2);
-	
+
+	// The alpha pixel with the lowest bit set to 0.
 	int row_alpha = row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset]
 	  - (row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset] % 2);
-	
+
+	// Add the new bit value to the 1_p_alpha pixel.
 	row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset] =
 	  (row_1_p_alpha + bit_1_p_alpha);
 
+	// Add the new bit value to the alpha pixel.
 	row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset] =
 	  (row_alpha + bit_alpha);
       }
