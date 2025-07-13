@@ -29,7 +29,7 @@ void gimp_pixel_rgn_set_row (GimpPixelRgn *pr,
 static void add_watermark (GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit_x, gint lower_limit_y, gint upper_limit_x, gint upper_limit_y, gint channels);
 
 // global variables
-unsigned char compressed_data[10000];
+unsigned char compressed_data[10000]; // Compressed version of the bits used for watermarking.
 size_t current_len = 0;
 
 void output_bie(unsigned char *start, size_t len, void *file)
@@ -158,9 +158,10 @@ add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit
   int encode_u = 6;
   int encode_v = 6;
 
-  guchar* row_arr[8];
+  guchar* row_arr[8]; // The array of rows of pixels in an image.
   int offset = 128; // To map the values from 0-255 to -128-127
-  guchar* original_bits;
+  guchar* original_bits; // The set of bits used for watermarking. We
+			 // have 2 bits per 8 x 8 block.
   
   gimp_drawable_mask_bounds (drawable->drawable_id,
                              &x1, &y1,
@@ -184,9 +185,15 @@ add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit
   }
 
   size_t original_bits_size = channels * (width / 8) * (height / 8 ) / 4;
-  original_bits = g_new(guchar, original_bits_size); // We need 2 bits per 8x8 block. One is for the signal, and the other is for the modulator.
-
-  gint max_difference = 0;
+  // We have 3 channels (colors) per pixel, and 8 x 8 pixels per
+  // block. We aim to get the number of blocks in the image. For 1024
+  // x 1024 images, there are (1024 x 1024) * 3 / (8 x 8) = (2^14) * 3
+  // blocks = 49152 blocks in this case.  Since there are 2 bits per
+  // block, we have 49152 blocks * 2 bits / block = 98304 bits = 98304
+  // bits / (8 bits / byte) = 12288 bytes.  The factor of division by
+  // 4 results from (2 bits / block) / (8 bits / byte).  The size is
+  // for byte addressing.
+  original_bits = g_new(guchar, original_bits_size);
 
   // Initialize the hasher.
   blake3_hasher hasher;
@@ -230,6 +237,7 @@ add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit
 
       for (j = 0; j < 8; ++j){
 	blake3_hasher_update(&hasher, row_arr[j], channels * (x2 - x1));
+	// Hash all of the pixels in the image.
       }
 
       // Break up into 8x8 subblocks of pixels
@@ -282,8 +290,16 @@ add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit
   
   guchar* new_bits = g_new(guchar, original_bits_size);
 
+  // The watermark is the hash of all pixels in the image and the bits
+  // before modification used for watermarking in a compressed form.
+
+  // Store the hash of all pixels in the image.
   memcpy(new_bits, blake3_hash, BLAKE3_OUT_LEN);
+
+  // Store the bits used for watermarking (2 pixels for each 8 x 8
+  // block.) in a compressed form.
   memcpy(new_bits + BLAKE3_OUT_LEN, compressed_data, current_len);
+  
   // Keep all the rest of the bits the same.
   memcpy(new_bits + BLAKE3_OUT_LEN + current_len, original_bits + BLAKE3_OUT_LEN + current_len,
 	 original_bits_size - BLAKE3_OUT_LEN - current_len);
