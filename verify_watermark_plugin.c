@@ -147,7 +147,7 @@ verify_watermark(GimpDrawable* drawable,
 
   guchar* row_arr[8];
   int offset = 128; // To map the values from 0-255 to -128-127
-  guchar* original_bits;
+  guchar* watermark_bits;
 
   gimp_drawable_mask_bounds(drawable->drawable_id, &x1, &y1, &x2, &y2);
   width = x2 - x1;
@@ -161,10 +161,11 @@ verify_watermark(GimpDrawable* drawable,
     row_arr[i] = g_new(guchar, channels * (x2 - x1));
   }
 
-  size_t original_bits_size = channels * (width / 8) * (height / 8) / 4;
-  original_bits = g_new(
-    guchar, original_bits_size); // We need 2 bits per 8x8 block. One is for the
-                                 // signal, and the other is for the modulator.
+  size_t watermark_bits_size = channels * (width / 8) * (height / 8) / 4;
+  watermark_bits =
+    g_new(guchar,
+          watermark_bits_size); // We need 2 bits per 8x8 block. One is for the
+                                // signal, and the other is for the modulator.
 
   for (i = y1; i < y2; i += 8) {
     /* Get row i through i+7 */
@@ -191,7 +192,7 @@ verify_watermark(GimpDrawable* drawable,
       int x_block = col_offset / 8;
       int y_block = (i - y1) / 8;
       int block_index = x_block + y_block * channels * width / 8;
-      int original_bit_index = block_index / 4;
+      int watermark_bit_index = block_index / 4;
       int sub_block_index = block_index & 3;
 
       const int x_bit_1_p_alpha_index = 0;
@@ -207,24 +208,25 @@ verify_watermark(GimpDrawable* drawable,
       int bit_alpha =
         (row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset] & 1);
 
-      int orig_value = bit_1_p_alpha + 2 * bit_alpha;
-      original_bits[original_bit_index] = original_bits[original_bit_index] |
-                                          (orig_value << (sub_block_index * 2));
+      int watermark_value = bit_1_p_alpha + 2 * bit_alpha;
+      watermark_bits[watermark_bit_index] =
+        watermark_bits[watermark_bit_index] |
+        (watermark_value << (sub_block_index * 2));
     }
 
     if (i % 10 == 0)
       gimp_progress_update((gdouble)(i - y1) / (gdouble)(y2 - y1));
   }
 
-  unsigned char* bitmaps[1] = { original_bits };
+  unsigned char* bitmaps[1] = { watermark_bits };
 
   struct jbg_dec_state sd;
 
   jbg_dec_init(&sd);
   size_t dec_offset;
   jbg_dec_in(&sd,
-             original_bits + BLAKE3_OUT_LEN,
-             original_bits_size - BLAKE3_OUT_LEN,
+             watermark_bits + BLAKE3_OUT_LEN,
+             watermark_bits_size - BLAKE3_OUT_LEN,
              &dec_offset);
   printf("offset: %d \n", dec_offset);
 
@@ -239,11 +241,11 @@ verify_watermark(GimpDrawable* drawable,
   printf("Width: %d \n", jbg_dec_getwidth(&sd));
   printf("Height: %d \n", jbg_dec_getheight(&sd));
 
-  printf("original_bit_size: %d \n", original_bits_size);
+  printf("original_bit_size: %d \n", watermark_bits_size);
 
   printf("blake3_hash: ");
   for (i = 0; i < BLAKE3_OUT_LEN; ++i) {
-    printf("%.2x ", original_bits[i]);
+    printf("%.2x ", watermark_bits[i]);
   }
   printf("\n");
 
@@ -271,7 +273,7 @@ verify_watermark(GimpDrawable* drawable,
       int x_block = col_offset / 8;
       int y_block = (i - y1) / 8;
       int block_index = x_block + y_block * channels * width / 8;
-      int original_bit_index = block_index / 4;
+      int watermark_bit_index = block_index / 4;
       int sub_block_index = block_index & 3;
 
       // int new_value = (new_bits[original_bit_index] >> (sub_block_index * 2))
