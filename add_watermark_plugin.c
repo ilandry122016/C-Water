@@ -243,23 +243,44 @@ add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit
       // Break up into 8x8 subblocks of pixels
       
       for (gint col_offset = 0; col_offset < channels * (x2 - x1); col_offset += 8){
-	int x_block = col_offset / 8;
-	int y_block = (i - y1) / 8;
-	int block_index = x_block + y_block * channels * width / 8;
+	int x_block = col_offset / 8; // the column index of each block.
+	int y_block = (i - y1) / 8; // the row index of each block
+	int block_index = x_block + y_block * channels * width / 8; // there are channel * width / 8 blocks per row.
+
+	// 2 bits per block are used. Gives the byte for the block.
 	int original_bit_index = block_index / 4;
+
+	// Gives the bits within the byte for this block.
 	int sub_block_index = block_index & 3;
 
+	// 1_p_alpha means 1 + alpha
+	// TODO: Hardcode which pixels to change. This should be fixed
+	// to use the hash to choose which pixels.
 	const int x_bit_1_p_alpha_index = 0;
 	const int y_bit_1_p_alpha_index = 0;
 
 	const int x_bit_alpha_index = 1;
 	const int y_bit_alpha_index = 0;
 
-	// Get the lowest 2 integer bits of the pixels.
+	// Select the bits to save for each pixel.
+	// This is the least significant bit for each pixel.
 	int bit_1_p_alpha = (row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset] & 1);
 	int bit_alpha = (row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset] & 1);
-      
+	
+	// Pack the bits to save into orig_value.
 	int orig_value = bit_1_p_alpha + 2 * bit_alpha;
+
+	// Save the bits into the original_bits array.
+	//
+	// Get the byte to set with original_bits[original_bit_index].
+	//
+	// Shift orig_value using "(orig_value << (sub_block_index * 2))"
+	// so that the two bits to set are in the right place in the byte.
+	// (we multiply sub_block_index by 2 because there are 2 bits
+	// per block).
+	//
+	// We "|" these two together to update the bit pattern for
+	// that byte.
 	original_bits[original_bit_index] = original_bits[original_bit_index] | (orig_value << (sub_block_index * 2));
       }      
 
@@ -279,9 +300,14 @@ add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit
 
   unsigned char *bitmaps[1] = {original_bits};
   struct jbg_enc_state se;
- 
+
+  // We choose (channels * width / 8) / 4 for the width in
+  // jbg_enc_init because there are channels * width / 8 blocks, and
+  // there are 2 bits = 1/4 bytes per block.
+  //
+  // initialize encoder
   jbg_enc_init(&se, (channels * width / 8) / 4, height / 8, 1, bitmaps, 
-	       output_bie, stdout);              /* initialize encoder */
+	       output_bie, stdout);
   jbg_enc_out(&se);                                    /* encode image */
   jbg_enc_free(&se);                    /* release allocated resources */
 
@@ -289,8 +315,7 @@ add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit
   printf("original_bits_size: %d \n", original_bits_size);
   
   guchar* new_bits = g_new(guchar, original_bits_size);
-  // guchar is maybe unsigned char?
-
+  
   // The watermark is the hash of all pixels in the image and the bits
   // before modification used for watermarking in a compressed form.
 
@@ -365,11 +390,11 @@ add_watermark(GimpDrawable *drawable, guchar *pixels_to_change, gint lower_limit
 
 	// Get the bits that we'll be setting.
 	//
-	// Get the byte with new_bits[original_index].
+	// Get the byte with new_bits[original_bit_index].
 	//
 	// Shift the byte so that the two bits we want are all the way
 	// to the right with ">> (sub_block_index * 2))" (we multiply
-	// sub_block_index by 2 because there are 2 bits per block.
+	// sub_block_index by 2 because there are 2 bits per block).
 	//
 	// We use "& 3" to select the lowest two bits because other
 	// bits are for other blocks.
