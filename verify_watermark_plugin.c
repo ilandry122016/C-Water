@@ -39,7 +39,8 @@ verify_watermark(GimpDrawable* drawable,
                  gint channels);
 
 // global variables
-unsigned char compressed_data[10000];
+unsigned char compressed_data[10000]; // Compressed version of the bits used
+                                      // for watermarking.
 size_t current_len = 0;
 
 GimpPlugInInfo PLUG_IN_INFO = { NULL, NULL, query, run };
@@ -145,9 +146,10 @@ verify_watermark(GimpDrawable* drawable,
   int encode_u = 6;
   int encode_v = 6;
 
-  guchar* row_arr[8];
-  int offset = 128; // To map the values from 0-255 to -128-127
-  guchar* watermark_bits;
+  guchar* row_arr[8];     // The array of rows of pixels in an image.
+  int offset = 128;       // To map the values from 0-255 to -128-127
+  guchar* watermark_bits; // The set of bits used for watermarking. We
+                          // have 2 bits per 8 x 8 block.
 
   gimp_drawable_mask_bounds(drawable->drawable_id, &x1, &y1, &x2, &y2);
   width = x2 - x1;
@@ -162,10 +164,15 @@ verify_watermark(GimpDrawable* drawable,
   }
 
   size_t watermark_bits_size = channels * (width / 8) * (height / 8) / 4;
-  watermark_bits =
-    g_new(guchar,
-          watermark_bits_size); // We need 2 bits per 8x8 block. One is for the
-                                // signal, and the other is for the modulator.
+  // We have 3 channels (colors) per pixel, and 8 x 8 pixels per
+  // block. We aim to get the number of blocks in the image. For 1024
+  // x 1024 images, there are (1024 x 1024) * 3 / (8 x 8) = (2^14) * 3
+  // blocks = 49152 blocks in this case.  Since there are 2 bits per
+  // block, we have 49152 blocks * 2 bits / block = 98304 bits = 98304
+  // bits / (8 bits / byte) = 12288 bytes.  The factor of division by
+  // 4 results from (2 bits / block) / (8 bits / byte).  The size is
+  // for byte addressing.
+  watermark_bits = g_new(guchar, watermark_bits_size);
 
   for (i = y1; i < y2; i += 8) {
     /* Get row i through i+7 */
@@ -189,26 +196,49 @@ verify_watermark(GimpDrawable* drawable,
 
     for (gint col_offset = 0; col_offset < channels * (x2 - x1);
          col_offset += 8) {
-      int x_block = col_offset / 8;
-      int y_block = (i - y1) / 8;
+      int x_block = col_offset / 8; // the column index of each block.
+      int y_block =
+        (i - y1) / 8; // the row index of each block
+                      // there are channel * width / 8 blocks per row.
       int block_index = x_block + y_block * channels * width / 8;
+
+      // 2 bits per block are used. Gives the byte for the block.
       int watermark_bit_index = block_index / 4;
+
+      // Gives the bits within the byte for this block.
       int sub_block_index = block_index & 3;
 
+      // 1_p_alpha means 1 + alpha
+      // TODO: Hardcode which pixels to change. This should be fixed
+      // to use the hash to choose which pixels.
       const int x_bit_1_p_alpha_index = 0;
       const int y_bit_1_p_alpha_index = 0;
 
       const int x_bit_alpha_index = 1;
       const int y_bit_alpha_index = 0;
 
-      // Get the lowest 2 integer bits of the pixels.
+      // Select the bits to save for each pixel.
+      // This is the least significant bit for each pixel.
       int bit_1_p_alpha =
         (row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset] &
          1);
       int bit_alpha =
         (row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset] & 1);
 
+      // Pack the bits to save into watermark_value.
       int watermark_value = bit_1_p_alpha + 2 * bit_alpha;
+
+      // Save the bits into the original_bits array.
+      //
+      // Get the byte to set with original_bits[original_bit_index].
+      //
+      // Shift orig_value using "(orig_value << (sub_block_index * 2))"
+      // so that the two bits to set are in the right place in the byte.
+      // (we multiply sub_block_index by 2 because there are 2 bits
+      // per block).
+      //
+      // We "|" these two together to update the bit pattern for
+      // that byte.
       watermark_bits[watermark_bit_index] =
         watermark_bits[watermark_bit_index] |
         (watermark_value << (sub_block_index * 2));
@@ -230,11 +260,10 @@ verify_watermark(GimpDrawable* drawable,
              &dec_offset);
   printf("offset: %d \n", dec_offset);
 
-  printf("crash point 1\n");
   int number_of_planes = jbg_dec_getplanes(&sd);
-  printf("crash point 2\n");
-  unsigned char* result_bitmap = jbg_dec_getimage(&sd, 0);
-  printf("crash point 3\n");
+
+  // Recover the hash and the original bits from the compressed data.
+  unsigned char* recovered_bits = jbg_dec_getimage(&sd, 0);
   long result_size = jbg_dec_getsize(&sd);
 
   printf("Result size: %d \n", result_size);
@@ -249,6 +278,7 @@ verify_watermark(GimpDrawable* drawable,
   }
   printf("\n");
 
+  // Restore the original image.
   for (i = y1; i < y2; i += 8) {
     /* Get row i through i+7 */
     gimp_pixel_rgn_get_row(&rgn_in, row_arr[0], x1, i, x2 - x1);
@@ -270,15 +300,64 @@ verify_watermark(GimpDrawable* drawable,
     // Break up into 8x8 subblocks of pixels
     for (gint col_offset = 0; col_offset < channels * (x2 - x1);
          col_offset += 8) {
-      int x_block = col_offset / 8;
-      int y_block = (i - y1) / 8;
-      int block_index = x_block + y_block * channels * width / 8;
-      int watermark_bit_index = block_index / 4;
+      int x_block = col_offset / 8; // the column index of each block.
+      int y_block = (i - y1) / 8;   // the row index of each block
+      int block_index =
+        x_block + y_block * channels * width /
+                    8; // there are channel * width / 8 blocks per row.
+
+      // 2 bits per block are used. Gives the byte for the block.
+      int recovered_bit_index = block_index / 4;
+
+      // Gives the bits within the byte for this block.
       int sub_block_index = block_index & 3;
 
-      // int new_value = (new_bits[original_bit_index] >> (sub_block_index * 2))
-      // & 3;
-      int new_value = 0;
+      // 1_p_alpha means 1 + alpha
+      // TODO: Hardcode which pixels to change. This should be fixed
+      // to use the hash to choose which pixels.
+      const int x_bit_1_p_alpha_index = 0;
+      const int y_bit_1_p_alpha_index = 0;
+
+      const int x_bit_alpha_index = 1;
+      const int y_bit_alpha_index = 0;
+
+      // Get the bits that we'll be setting.
+      //
+      // Get the byte with new_bits[original_bit_index].
+      //
+      // Shift the byte so that the two bits we want are all the way
+      // to the right with ">> (sub_block_index * 2))" (we multiply
+      // sub_block_index by 2 because there are 2 bits per block).
+      //
+      // We use "& 3" to select the lowest two bits because other
+      // bits are for other blocks.
+      int recovered_value =
+        (recovered_bits[recovered_bit_index] >> (sub_block_index * 2)) & 3;
+
+      // Select the new values of the bits for each pixel.
+      //
+      // new_value has two bits. "&" it with 1 to get the lowest
+      // bit. divide by 2 to get the next bit.
+      // The order is arbitrary.
+      int bit_1_p_alpha = (recovered_value & 1);
+      int bit_alpha = (recovered_value / 2);
+
+      // The 1_p_alpha pixel with the lowest bit set to 0.
+      int row_1_p_alpha =
+        (row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset] &
+         0xfe);
+
+      // The alpha pixel with the lowest bit set to 0.
+      int row_alpha =
+        (row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset] & 0xfe);
+
+      // Add the new bit value to the 1_p_alpha pixel.
+      row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset] =
+        (row_1_p_alpha + bit_1_p_alpha);
+
+      // Add the new bit value to the alpha pixel.
+      row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset] =
+        (row_alpha + bit_alpha);
     }
 
     for (k = 0; k < 8; ++k) {
@@ -292,11 +371,6 @@ verify_watermark(GimpDrawable* drawable,
   for (i = 0; i < 8; ++i) {
     g_free(row_arr[i]);
   }
-
-  /* gimp_pixel_rgn_set_row(&rgn_out, */
-  /* 			 original_bits[1], */
-  /* 			 x1, 1, */
-  /* 			 x2 - x1); */
 
   printf("Assertion point.\n");
 
