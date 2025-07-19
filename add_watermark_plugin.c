@@ -33,7 +33,6 @@ gimp_pixel_rgn_set_row(GimpPixelRgn* pr,
 
 static void
 add_watermark(GimpDrawable* drawable,
-              guchar* pixels_to_change,
               gint lower_limit_x,
               gint lower_limit_y,
               gint upper_limit_x,
@@ -41,7 +40,7 @@ add_watermark(GimpDrawable* drawable,
               gint channels);
 
 // global variables
-unsigned char compressed_data[10000]; // Compressed version of the bits used
+unsigned char* compressed_data; // Compressed version of the bits used
                                       // for watermarking.
 size_t current_len = 0;
 
@@ -97,11 +96,11 @@ run(const gchar* name,
 
   gimp_drawable_mask_bounds(drawable->drawable_id, &x1, &y1, &x2, &y2);
 
-  guchar* pixels_to_change;
-  gint channels = gimp_drawable_bpp(drawable->drawable_id);
-  pixels_to_change = g_new(guchar, channels * (x2 - x1) * (y2 - y1));
 
-  add_watermark(drawable, pixels_to_change, x1, x2, y1, y2, channels);
+  gint channels = gimp_drawable_bpp(drawable->drawable_id);
+
+
+  add_watermark(drawable, x1, x2, y1, y2, channels);
 
   gimp_displays_flush();
   gimp_drawable_detach(drawable);
@@ -137,7 +136,6 @@ query(void)
 
 static void
 add_watermark(GimpDrawable* drawable,
-              guchar* pixels_to_change,
               gint lower_limit_x,
               gint lower_limit_y,
               gint upper_limit_x,
@@ -209,10 +207,32 @@ add_watermark(GimpDrawable* drawable,
     gimp_pixel_rgn_get_row(
       &rgn_in, row_arr[7], x1, MIN(y2 - 1, i + 7), x2 - x1);
 
-    for (j = 0; j < 8; ++j) {
-      blake3_hasher_update(&hasher, row_arr[j], channels * (x2 - x1));
-      // Hash all of the pixels in the image.
+    if (i <= y1 + 127){
+      /* printf("first row of row_arr: "); */
+      /* for (j = x1; (j < x2) && (j < x1 + 100); ++j){ */
+      /* 	printf("%.2x ", (row_arr[0][j])); */
+      /* } */
+      /* printf("\n"); */
+      
+      for (j = 0; j < 8; ++j) {
+	// Hash all of the pixels in the image.
+	blake3_hasher_update(&hasher, row_arr[j], channels * (x2 - x1));
+      }
     }
+
+    
+    if (i == y1 + 128){
+      printf("128'th row of row_arr: ");
+      for (j = x1; (j < x2) && (j < x1 + 100); ++j){
+	printf("%.2x ", (row_arr[0][j]));
+      }
+      printf("\n");
+    }
+
+    /* for (j = 0; j < 8; ++j) { */
+    /*   // Hash all of the pixels in the image. */
+    /*   blake3_hasher_update(&hasher, row_arr[j], channels * (x2 - x1)); */
+    /* } */
 
     // Break up into 8x8 subblocks of pixels
 
@@ -241,7 +261,8 @@ add_watermark(GimpDrawable* drawable,
       // Select the bits to save for each pixel.
       // This is the least significant bit for each pixel.
       int bit_1_p_alpha =
-        (row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset] & 1);
+        (row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset] &
+         1);
       int bit_alpha =
         (row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset] & 1);
 
@@ -261,8 +282,19 @@ add_watermark(GimpDrawable* drawable,
       // that byte.
       original_bits[original_bit_index] = original_bits[original_bit_index] |
                                           (orig_value << (sub_block_index * 2));
-    }
 
+      if (i == y1 + 128 && col_offset == 8){
+	printf("\nbit_1_p_alpha: %d \n", bit_1_p_alpha);
+	printf("bit_alpha: %d \n", bit_alpha);
+	printf("orig_value: %d \n", orig_value);
+	printf("original_bit_index: %d \n", original_bit_index);
+
+	printf("original_bits: %.2x\n", original_bits[original_bit_index]);
+
+	printf("row_arr: %.2x %.2x\n", row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset],  row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset]);
+      }
+    }
+      
     if (i % 10 == 0)
       gimp_progress_update((gdouble)(i - y1) / (gdouble)(y2 - y1));
   }
@@ -278,6 +310,9 @@ add_watermark(GimpDrawable* drawable,
   printf("\n");
 
   unsigned char* bitmaps[1] = { original_bits };
+  // TODO: this shouldn't be bigger than original_bits. Otherwise, it won't fit.
+  compressed_data = malloc(2 * original_bits_size);
+						     
   struct jbg_enc_state se;
 
   // We choose (channels * width / 8) / 4 for the width in
@@ -286,7 +321,9 @@ add_watermark(GimpDrawable* drawable,
   //
   // initialize encoder
   jbg_enc_init(&se,
-               (channels * width / 8) / 4,
+	       // TODO: should be 2 * but that does not fit, so divide by 4
+	       //               (2 * channels * width / 8),
+	       (channels * width / 8) / 4,
                height / 8,
                1,
                bitmaps,
@@ -309,6 +346,8 @@ add_watermark(GimpDrawable* drawable,
   // Store the bits used for watermarking (2 pixels for each 8 x 8
   // block.) in a compressed form.
   memcpy(new_bits + BLAKE3_OUT_LEN, compressed_data, current_len);
+
+  free(compressed_data);
 
   // Keep all the rest of the bits the same.
   memcpy(new_bits + BLAKE3_OUT_LEN + current_len,
@@ -380,7 +419,8 @@ add_watermark(GimpDrawable* drawable,
 
       // The 1_p_alpha pixel with the lowest bit set to 0.
       int row_1_p_alpha =
-        (row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset] & 0xfe);
+        (row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset] &
+         0xfe);
 
       // The alpha pixel with the lowest bit set to 0.
       int row_alpha =
@@ -395,6 +435,14 @@ add_watermark(GimpDrawable* drawable,
         (row_alpha + bit_alpha);
     }
 
+    if (i == y1 + 128){
+      printf("128'th row of row_arr: ");
+      for (j = x1; (j < x2) && (j < x1 + 100); ++j){
+	printf("%.2x ", (row_arr[0][j]));
+      }
+      printf("\n");
+    }
+
     for (k = 0; k < 8; ++k) {
       gimp_pixel_rgn_set_row(&rgn_out, row_arr[k], x1, i + k, x2 - x1);
     }
@@ -406,6 +454,9 @@ add_watermark(GimpDrawable* drawable,
   for (i = 0; i < 8; ++i) {
     g_free(row_arr[i]);
   }
+
+  g_free(original_bits);
+  g_free(new_bits);
 
   gimp_drawable_flush(drawable);
   gimp_drawable_merge_shadow(drawable->drawable_id, TRUE);

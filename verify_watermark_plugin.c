@@ -254,11 +254,15 @@ verify_watermark(GimpDrawable* drawable,
 
   jbg_dec_init(&sd);
   size_t dec_offset;
-  jbg_dec_in(&sd,
+  int jbig_result = jbg_dec_in(&sd,
              watermark_bits + BLAKE3_OUT_LEN,
              watermark_bits_size - BLAKE3_OUT_LEN,
              &dec_offset);
   printf("offset: %d \n", dec_offset);
+  printf("jbig_result: %d \n", jbig_result);
+  printf("JBG_EAGAIN: %d \n", JBG_EAGAIN);
+  printf("JBG_EOK: %d \n", JBG_EOK);
+  printf("JBG_EOK_INTR: %d \n", JBG_EOK_INTR);
 
   int number_of_planes = jbg_dec_getplanes(&sd);
 
@@ -277,6 +281,10 @@ verify_watermark(GimpDrawable* drawable,
     printf("%.2x ", watermark_bits[i]);
   }
   printf("\n");
+
+  // Initialize the hasher.
+  blake3_hasher hasher;
+  blake3_hasher_init(&hasher);
 
   // Restore the original image.
   for (i = y1; i < y2; i += 8) {
@@ -351,6 +359,18 @@ verify_watermark(GimpDrawable* drawable,
       int row_alpha =
         (row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset] & 0xfe);
 
+      if (i == y1 + 128 && col_offset == 8){
+	printf("\nbit_1_p_alpha: %d \n", bit_1_p_alpha);
+	printf("bit_alpha: %d \n", bit_alpha);
+	printf("row_1_p_alpha: %d \n", row_1_p_alpha);
+	printf("row_alpha: %d \n", row_alpha);
+	printf("recovered_value: %d \n", recovered_value);
+	printf("recovered_bit_index: %d \n", recovered_bit_index);
+	printf("recovered_bits: %.2x \n", recovered_bits[recovered_bit_index]);
+
+	printf("Before: %.2x %.2x\n", row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset],  row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset]);
+      }
+       
       // Add the new bit value to the 1_p_alpha pixel.
       row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset] =
         (row_1_p_alpha + bit_1_p_alpha);
@@ -358,15 +378,53 @@ verify_watermark(GimpDrawable* drawable,
       // Add the new bit value to the alpha pixel.
       row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset] =
         (row_alpha + bit_alpha);
+
+      if (i == y1 + 128 && col_offset == 8){
+	printf("After: %.2x %.2x\n", row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset],  row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset]);
+      }
     }
 
     for (k = 0; k < 8; ++k) {
       gimp_pixel_rgn_set_row(&rgn_out, row_arr[k], x1, i + k, x2 - x1);
+      // Hash all of the pixels in the image.
+      /* blake3_hasher_update(&hasher, row_arr[k], channels * (x2 - x1)); */
+    }
+
+    if (i <= y1 + 127){
+      /* printf("first row of row_arr: "); */
+      /* for (j = x1; (j < x2) && (j < x1 + 100); ++j){ */
+      /* 	printf("%.2x ", (row_arr[0][j])); */
+      /* } */
+      /* printf("\n"); */
+
+      for (k = 0; k < 8; ++k) {
+	// Hash all of the pixels in the image.
+	blake3_hasher_update(&hasher, row_arr[k], channels * (x2 - x1));
+      }
+
+    }
+
+    if (i == y1 + 128){
+      printf("128'th row of row_arr: ");
+      for (j = x1; (j < x2) && (j < x1 + 100); ++j){
+	printf("%.2x ", (row_arr[0][j]));
+      }
+      printf("\n");
     }
 
     if (i % 10 == 0)
       gimp_progress_update((gdouble)(i - y1) / (gdouble)(y2 - y1));
   }
+
+  // Finalize the hash. BLAKE3_OUT_LEN is the default output length, 32 bytes.
+  uint8_t blake3_hash[BLAKE3_OUT_LEN];
+  blake3_hasher_finalize(&hasher, blake3_hash, BLAKE3_OUT_LEN);
+
+  printf("blake3_hash: ");
+  for (i = 0; i < BLAKE3_OUT_LEN; ++i) {
+    printf("%.2x ", blake3_hash[i]);
+  }
+  printf("\n");
 
   for (i = 0; i < 8; ++i) {
     g_free(row_arr[i]);
