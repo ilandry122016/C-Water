@@ -237,7 +237,7 @@ add_watermark(GimpDrawable* drawable,
     // Break up into 8x8 subblocks of pixels
 
     for (gint col_offset = 0; col_offset < channels * (x2 - x1);
-         col_offset += 8) {
+         col_offset += 24) {
       int x_block = col_offset / 8; // the column index of each block.
       int y_block = (i - y1) / 8;   // the row index of each block
       // there are channel * width / 8 blocks per row.
@@ -323,7 +323,8 @@ add_watermark(GimpDrawable* drawable,
   jbg_enc_init(&se,
 	       // TODO: should be 2 * but that does not fit, so divide by 4
 	       //               (2 * channels * width / 8),
-	       (channels * width / 8) / 4,
+	       //	       (channels * width / 8) / 4,
+	       width / 4,
                height / 8,
                1,
                bitmaps,
