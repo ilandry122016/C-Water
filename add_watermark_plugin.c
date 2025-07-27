@@ -359,9 +359,9 @@ add_watermark(GimpDrawable* drawable,
   // initialize encoder
   jbg_enc_init(&se,
                // TODO: should be 2 * but that does not fit, so divide by 4
-               //               (2 * channels * width / 8),
+	       (2 * channels * width / 8),
                //	       (channels * width / 8) / 4,
-               width / 4,
+               // width / 4,
                height / 8,
                1,
                bitmaps,
