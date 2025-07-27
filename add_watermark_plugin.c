@@ -44,6 +44,18 @@ unsigned char* compressed_data; // Compressed version of the bits used
                                 // for watermarking.
 size_t current_len = 0;
 
+int
+my_min(int a, int b)
+{
+  return (a < b) ? a : b;
+}
+
+int
+my_max(int a, int b)
+{
+  return (a > b) ? a : b;
+}
+
 void
 output_bie(unsigned char* start, size_t len, void* file)
 {
@@ -246,26 +258,6 @@ add_watermark(GimpDrawable* drawable,
       // Gives the bits within the byte for this block.
       int sub_block_index = block_index & 3;
 
-      // 1_p_alpha means 1 + alpha
-      // TODO: Hardcode which pixels to change. This should be fixed
-      // to use the hash to choose which pixels.
-      const int x_bit_1_p_alpha_index = 0;
-      const int y_bit_1_p_alpha_index = 0;
-
-      const int x_bit_alpha_index = 1;
-      const int y_bit_alpha_index = 0;
-
-      // Select the bits to save for each pixel.
-      // This is the least significant bit for each pixel.
-      int bit_1_p_alpha =
-        (row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset] &
-         1);
-      int bit_alpha =
-        (row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset] & 1);
-
-      // Pack the bits to save into orig_value.
-      int orig_value = bit_1_p_alpha + 2 * bit_alpha;
-
       int32_t G_6_6_central = 0;
 
       for (x = 1; x <= 2; ++x) {
@@ -294,7 +286,8 @@ add_watermark(GimpDrawable* drawable,
         }
       }
 
-      orig_value =
+      // Pack the bits to save into orig_value.
+      int orig_value =
         ((abs(G_6_6_central) >> 4) & 1) + ((abs(G_6_6_edge) >> 4) & 2);
 
       // Save the bits into the original_bits array.
@@ -314,17 +307,18 @@ add_watermark(GimpDrawable* drawable,
       // printf("G_6_6_central: %d %d %d %d %d \n", col_offset, i,
       // G_6_6_central, G_6_6_edge, orig_value);
       if (i == y1 + 128 && col_offset == 8) {
-        printf("\nbit_1_p_alpha: %d \n", bit_1_p_alpha);
-        printf("bit_alpha: %d \n", bit_alpha);
+        /* printf("\nbit_1_p_alpha: %d \n", bit_1_p_alpha); */
+        /* printf("bit_alpha: %d \n", bit_alpha); */
         printf("orig_value: %d \n", orig_value);
         printf("original_bit_index: %d \n", original_bit_index);
 
         printf("original_bits: %.2x\n", original_bits[original_bit_index]);
 
-        printf(
-          "row_arr: %.2x %.2x\n",
-          row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset],
-          row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset]);
+        /* printf( */
+        /*   "row_arr: %.2x %.2x\n", */
+        /*   row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset],
+         */
+        /*   row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset]); */
       }
     }
 
@@ -359,7 +353,7 @@ add_watermark(GimpDrawable* drawable,
   // initialize encoder
   jbg_enc_init(&se,
                // TODO: should be 2 * but that does not fit, so divide by 4
-	       (2 * channels * width / 8),
+               (2 * channels * width / 8),
                //	       (channels * width / 8) / 4,
                // width / 4,
                height / 8,
@@ -425,15 +419,6 @@ add_watermark(GimpDrawable* drawable,
       // Gives the bits within the byte for this block.
       int sub_block_index = block_index & 3;
 
-      // 1_p_alpha means 1 + alpha
-      // TODO: Hardcode which pixels to change. This should be fixed
-      // to use the hash to choose which pixels.
-      const int x_bit_1_p_alpha_index = 0;
-      const int y_bit_1_p_alpha_index = 0;
-
-      const int x_bit_alpha_index = 1;
-      const int y_bit_alpha_index = 0;
-
       // Get the bits that we'll be setting.
       //
       // Get the byte with new_bits[original_bit_index].
@@ -455,26 +440,46 @@ add_watermark(GimpDrawable* drawable,
       int bit_1_p_alpha = (new_value & 1);
       int bit_alpha = (new_value / 2);
 
-      // The 1_p_alpha pixel with the lowest bit set to 0.
-      int row_1_p_alpha =
-        (row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset] &
-         0xfe);
+      for (x = 1; x <= 2; ++x) {
+        for (y = 1; y <= 2; ++y) {
+          int sgn = (((x + y) % 2) == 0) ? 1 : -1;
+          row_arr[y][col_offset + x] =
+            my_max(0, my_min(255, row_arr[y][col_offset + x] + sgn));
+          row_arr[y + 4][col_offset + x] =
+            my_max(0, my_min(255, row_arr[y + 4][col_offset + x] - sgn));
+          row_arr[y][col_offset + x + 4] =
+            my_max(0, my_min(255, row_arr[y][col_offset + x + 4] - sgn));
+	  row_arr[y + 4][col_offset + x + 4] =
+            my_max(0, my_min(255, row_arr[y + 4][col_offset + x + 4] + sgn));
+        }
+      }
 
-      // The alpha pixel with the lowest bit set to 0.
-      int row_alpha =
-        (row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset] & 0xfe);
+      for (x = 0; x <= 3; x += 3) {
+        for (y = 1; y <= 2; ++y) {
+          int sgn = (((x + y) % 2) == 0) ? 1 : -1;
+          row_arr[y][col_offset + x] =
+            my_max(0, my_min(255, row_arr[y][col_offset + x] + sgn));
+          row_arr[y + 4][col_offset + x] =
+            my_max(0, my_min(255, row_arr[y + 4][col_offset + x] - sgn));
+	  row_arr[y][col_offset + x + 4] =
+            my_max(0, my_min(255, row_arr[y][col_offset + x + 4] - sgn));
+	  row_arr[y + 4][col_offset + x + 4] =
+            my_max(0, my_min(255, row_arr[y + 4][col_offset + x + 4] + sgn));
 
-      // Add the new bit value to the 1_p_alpha pixel.
-      row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset] =
-        (row_1_p_alpha + bit_1_p_alpha);
-
-      // Add the new bit value to the alpha pixel.
-      row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset] =
-        (row_alpha + bit_alpha);
+          row_arr[x][col_offset + y] =
+            my_max(0, my_min(255, row_arr[x][col_offset + y] + sgn));
+          row_arr[x + 4][col_offset + y] =
+            my_max(0, my_min(255, row_arr[x + 4][col_offset + y] - sgn));
+	  row_arr[x][col_offset + y + 4] =
+            my_max(0, my_min(255, row_arr[x][col_offset + y + 4] - sgn));
+	  row_arr[x + 4][col_offset + y + 4] =
+            my_max(0, my_min(255, row_arr[x + 4][col_offset + y + 4] + sgn));
+	}
+      }
     }
 
-    if (i == y1 + 128) {
-      printf("128'th row of row_arr: ");
+    if (i == y1) {
+      printf("0'th row of row_arr: ");
       for (j = x1; (j < x2) && (j < x1 + 100); ++j) {
         printf("%.2x ", (row_arr[0][j]));
       }
