@@ -41,7 +41,7 @@ add_watermark(GimpDrawable* drawable,
 
 // global variables
 unsigned char* compressed_data; // Compressed version of the bits used
-                                      // for watermarking.
+                                // for watermarking.
 size_t current_len = 0;
 
 void
@@ -96,9 +96,7 @@ run(const gchar* name,
 
   gimp_drawable_mask_bounds(drawable->drawable_id, &x1, &y1, &x2, &y2);
 
-
   gint channels = gimp_drawable_bpp(drawable->drawable_id);
-
 
   add_watermark(drawable, x1, x2, y1, y2, channels);
 
@@ -207,24 +205,23 @@ add_watermark(GimpDrawable* drawable,
     gimp_pixel_rgn_get_row(
       &rgn_in, row_arr[7], x1, MIN(y2 - 1, i + 7), x2 - x1);
 
-    if (i <= y1 + 127){
+    if (i <= y1 + 127) {
       /* printf("first row of row_arr: "); */
       /* for (j = x1; (j < x2) && (j < x1 + 100); ++j){ */
       /* 	printf("%.2x ", (row_arr[0][j])); */
       /* } */
       /* printf("\n"); */
-      
+
       for (j = 0; j < 8; ++j) {
-	// Hash all of the pixels in the image.
-	blake3_hasher_update(&hasher, row_arr[j], channels * (x2 - x1));
+        // Hash all of the pixels in the image.
+        blake3_hasher_update(&hasher, row_arr[j], channels * (x2 - x1));
       }
     }
 
-    
-    if (i == y1 + 128){
+    if (i == y1 + 128) {
       printf("128'th row of row_arr: ");
-      for (j = x1; (j < x2) && (j < x1 + 100); ++j){
-	printf("%.2x ", (row_arr[0][j]));
+      for (j = x1; (j < x2) && (j < x1 + 100); ++j) {
+        printf("%.2x ", (row_arr[0][j]));
       }
       printf("\n");
     }
@@ -269,6 +266,37 @@ add_watermark(GimpDrawable* drawable,
       // Pack the bits to save into orig_value.
       int orig_value = bit_1_p_alpha + 2 * bit_alpha;
 
+      int32_t G_6_6_central = 0;
+
+      for (x = 1; x <= 2; ++x) {
+        for (y = 1; y <= 2; ++y) {
+          int sgn = (((x + y) % 2) == 0) ? 1 : -1;
+          G_6_6_central += sgn * (row_arr[y][col_offset + x] - offset);
+          G_6_6_central += -sgn * (row_arr[y + 4][col_offset + x] - offset);
+          G_6_6_central += -sgn * (row_arr[y][col_offset + x + 4] - offset);
+          G_6_6_central += sgn * (row_arr[y + 4][col_offset + x + 4] - offset);
+        }
+      }
+
+      int32_t G_6_6_edge = 0;
+
+      for (x = 0; x <= 3; x += 3) {
+        for (y = 1; y <= 2; ++y) {
+          int sgn = (((x + y) % 2) == 0) ? 1 : -1;
+          G_6_6_edge += sgn * (row_arr[y][col_offset + x] +
+                               row_arr[x][col_offset + y] - 2 * offset);
+          G_6_6_edge += -sgn * (row_arr[y + 4][col_offset + x] +
+                                row_arr[x][col_offset + y + 4] - 2 * offset);
+          G_6_6_edge += -sgn * (row_arr[y][col_offset + x + 4] +
+                                row_arr[x + 4][col_offset + y] - 2 * offset);
+          G_6_6_edge += sgn * (row_arr[y + 4][col_offset + x + 4] +
+                               row_arr[x + 4][col_offset + y + 4] - 2 * offset);
+        }
+      }
+
+      orig_value =
+        ((abs(G_6_6_central) >> 4) & 1) + ((abs(G_6_6_edge) >> 4) & 2);
+
       // Save the bits into the original_bits array.
       //
       // Get the byte to set with original_bits[original_bit_index].
@@ -283,18 +311,23 @@ add_watermark(GimpDrawable* drawable,
       original_bits[original_bit_index] = original_bits[original_bit_index] |
                                           (orig_value << (sub_block_index * 2));
 
-      if (i == y1 + 128 && col_offset == 8){
-	printf("\nbit_1_p_alpha: %d \n", bit_1_p_alpha);
-	printf("bit_alpha: %d \n", bit_alpha);
-	printf("orig_value: %d \n", orig_value);
-	printf("original_bit_index: %d \n", original_bit_index);
+      // printf("G_6_6_central: %d %d %d %d %d \n", col_offset, i,
+      // G_6_6_central, G_6_6_edge, orig_value);
+      if (i == y1 + 128 && col_offset == 8) {
+        printf("\nbit_1_p_alpha: %d \n", bit_1_p_alpha);
+        printf("bit_alpha: %d \n", bit_alpha);
+        printf("orig_value: %d \n", orig_value);
+        printf("original_bit_index: %d \n", original_bit_index);
 
-	printf("original_bits: %.2x\n", original_bits[original_bit_index]);
+        printf("original_bits: %.2x\n", original_bits[original_bit_index]);
 
-	printf("row_arr: %.2x %.2x\n", row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset],  row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset]);
+        printf(
+          "row_arr: %.2x %.2x\n",
+          row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset],
+          row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset]);
       }
     }
-      
+
     if (i % 10 == 0)
       gimp_progress_update((gdouble)(i - y1) / (gdouble)(y2 - y1));
   }
@@ -309,10 +342,14 @@ add_watermark(GimpDrawable* drawable,
   }
   printf("\n");
 
+  /* for (size_t index = 0; index < original_bits_size; ++index) { */
+  /*   original_bits[index] = 0xAB; */
+  /* } */
+
   unsigned char* bitmaps[1] = { original_bits };
   // TODO: this shouldn't be bigger than original_bits. Otherwise, it won't fit.
   compressed_data = malloc(2 * original_bits_size);
-						     
+
   struct jbg_enc_state se;
 
   // We choose (channels * width / 8) / 4 for the width in
@@ -321,10 +358,10 @@ add_watermark(GimpDrawable* drawable,
   //
   // initialize encoder
   jbg_enc_init(&se,
-	       // TODO: should be 2 * but that does not fit, so divide by 4
-	       //               (2 * channels * width / 8),
-	       //	       (channels * width / 8) / 4,
-	       width / 4,
+               // TODO: should be 2 * but that does not fit, so divide by 4
+               //               (2 * channels * width / 8),
+               //	       (channels * width / 8) / 4,
+               width / 4,
                height / 8,
                1,
                bitmaps,
@@ -436,10 +473,10 @@ add_watermark(GimpDrawable* drawable,
         (row_alpha + bit_alpha);
     }
 
-    if (i == y1 + 128){
+    if (i == y1 + 128) {
       printf("128'th row of row_arr: ");
-      for (j = x1; (j < x2) && (j < x1 + 100); ++j){
-	printf("%.2x ", (row_arr[0][j]));
+      for (j = x1; (j < x2) && (j < x1 + 100); ++j) {
+        printf("%.2x ", (row_arr[0][j]));
       }
       printf("\n");
     }
