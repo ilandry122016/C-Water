@@ -432,6 +432,8 @@ add_watermark(GimpDrawable* drawable,
       int new_value =
         (new_bits[original_bit_index] >> (sub_block_index * 2)) & 3;
 
+      int original_value =
+        (original_bits[original_bit_index] >> (sub_block_index * 2)) & 3;
       // Select the new values of the bits for each pixel.
       //
       // new_value has two bits. "&" it with 1 to get the lowest
@@ -440,41 +442,54 @@ add_watermark(GimpDrawable* drawable,
       int bit_1_p_alpha = (new_value & 1);
       int bit_alpha = (new_value / 2);
 
-      for (x = 1; x <= 2; ++x) {
-        for (y = 1; y <= 2; ++y) {
-          int sgn = (((x + y) % 2) == 0) ? 1 : -1;
-          row_arr[y][col_offset + x] =
-            my_max(0, my_min(255, row_arr[y][col_offset + x] + sgn));
-          row_arr[y + 4][col_offset + x] =
-            my_max(0, my_min(255, row_arr[y + 4][col_offset + x] - sgn));
-          row_arr[y][col_offset + x + 4] =
-            my_max(0, my_min(255, row_arr[y][col_offset + x + 4] - sgn));
-	  row_arr[y + 4][col_offset + x + 4] =
-            my_max(0, my_min(255, row_arr[y + 4][col_offset + x + 4] + sgn));
+      int original_bit_1_p_alpha = (original_value & 1);
+      int original_bit_alpha = (original_value / 2);
+
+      if (original_bit_1_p_alpha != bit_1_p_alpha) {
+        // If we are adding a bit, then bit_1_p_alpha == 1 and
+        // original_bit_1_p_alpha == 0.
+        int add_subtract = (original_bit_1_p_alpha == 0) ? 1 : -1;
+        for (x = 1; x <= 2; ++x) {
+          for (y = 1; y <= 2; ++y) {
+            int sgn = ((((x + y) % 2) == 0) ? 1 : -1) * add_subtract;
+            row_arr[y][col_offset + x] =
+              my_max(0, my_min(255, row_arr[y][col_offset + x] + sgn));
+            row_arr[y + 4][col_offset + x] =
+              my_max(0, my_min(255, row_arr[y + 4][col_offset + x] - sgn));
+            row_arr[y][col_offset + x + 4] =
+              my_max(0, my_min(255, row_arr[y][col_offset + x + 4] - sgn));
+            row_arr[y + 4][col_offset + x + 4] =
+              my_max(0, my_min(255, row_arr[y + 4][col_offset + x + 4] + sgn));
+          }
         }
       }
 
-      for (x = 0; x <= 3; x += 3) {
-        for (y = 1; y <= 2; ++y) {
-          int sgn = (((x + y) % 2) == 0) ? 1 : -1;
-          row_arr[y][col_offset + x] =
-            my_max(0, my_min(255, row_arr[y][col_offset + x] + sgn));
-          row_arr[y + 4][col_offset + x] =
-            my_max(0, my_min(255, row_arr[y + 4][col_offset + x] - sgn));
-	  row_arr[y][col_offset + x + 4] =
-            my_max(0, my_min(255, row_arr[y][col_offset + x + 4] - sgn));
-	  row_arr[y + 4][col_offset + x + 4] =
-            my_max(0, my_min(255, row_arr[y + 4][col_offset + x + 4] + sgn));
+      if (original_bit_alpha != bit_alpha) {
+        // If we are adding a bit, then bit_alpha == 1 and original_bit_alpha ==
+        // 0.
+        int add_subtract = (original_bit_alpha == 0) ? 1 : -1;
+        for (x = 0; x <= 3; x += 3) {
+          for (y = 1; y <= 2; ++y) {
+            int sgn = ((((x + y) % 2) == 0) ? 1 : -1) * add_subtract;
+            row_arr[y][col_offset + x] =
+              my_max(0, my_min(255, row_arr[y][col_offset + x] + sgn));
+            row_arr[y + 4][col_offset + x] =
+              my_max(0, my_min(255, row_arr[y + 4][col_offset + x] - sgn));
+            row_arr[y][col_offset + x + 4] =
+              my_max(0, my_min(255, row_arr[y][col_offset + x + 4] - sgn));
+            row_arr[y + 4][col_offset + x + 4] =
+              my_max(0, my_min(255, row_arr[y + 4][col_offset + x + 4] + sgn));
 
-          row_arr[x][col_offset + y] =
-            my_max(0, my_min(255, row_arr[x][col_offset + y] + sgn));
-          row_arr[x + 4][col_offset + y] =
-            my_max(0, my_min(255, row_arr[x + 4][col_offset + y] - sgn));
-	  row_arr[x][col_offset + y + 4] =
-            my_max(0, my_min(255, row_arr[x][col_offset + y + 4] - sgn));
-	  row_arr[x + 4][col_offset + y + 4] =
-            my_max(0, my_min(255, row_arr[x + 4][col_offset + y + 4] + sgn));
-	}
+            row_arr[x][col_offset + y] =
+              my_max(0, my_min(255, row_arr[x][col_offset + y] + sgn));
+            row_arr[x + 4][col_offset + y] =
+              my_max(0, my_min(255, row_arr[x + 4][col_offset + y] - sgn));
+            row_arr[x][col_offset + y + 4] =
+              my_max(0, my_min(255, row_arr[x][col_offset + y + 4] - sgn));
+            row_arr[x + 4][col_offset + y + 4] =
+              my_max(0, my_min(255, row_arr[x + 4][col_offset + y + 4] + sgn));
+          }
+        }
       }
     }
 
