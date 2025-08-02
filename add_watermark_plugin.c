@@ -44,16 +44,18 @@ unsigned char* compressed_data; // Compressed version of the bits used
                                 // for watermarking.
 size_t current_len = 0;
 
-int
-my_min(int a, int b)
+char
+add_32(char pixel_value, int adjustment)
 {
-  return (a < b) ? a : b;
-}
+  char high_bits = pixel_value & 0xF0;
+  char low_bits = pixel_value & 0x0F;
 
-int
-my_max(int a, int b)
-{
-  return (a > b) ? a : b;
+  // Add and only take the low bits. This is equivalent to taking mod 32.
+  low_bits += adjustment;
+  low_bits = low_bits & 0x0F;
+
+  // Gives the original high_bits and the new low_bits.
+  return high_bits | low_bits;
 }
 
 void
@@ -453,13 +455,13 @@ add_watermark(GimpDrawable* drawable,
           for (y = 1; y <= 2; ++y) {
             int sgn = ((((x + y) % 2) == 0) ? 1 : -1) * add_subtract;
             row_arr[y][col_offset + x] =
-              my_max(0, my_min(255, row_arr[y][col_offset + x] + sgn));
+              add_32(row_arr[y][col_offset + x], sgn);
             row_arr[y + 4][col_offset + x] =
-              my_max(0, my_min(255, row_arr[y + 4][col_offset + x] - sgn));
+              add_32(row_arr[y + 4][col_offset + x], -sgn);
             row_arr[y][col_offset + x + 4] =
-              my_max(0, my_min(255, row_arr[y][col_offset + x + 4] - sgn));
+              add_32(row_arr[y][col_offset + x + 4], -sgn);
             row_arr[y + 4][col_offset + x + 4] =
-              my_max(0, my_min(255, row_arr[y + 4][col_offset + x + 4] + sgn));
+              add_32(row_arr[y + 4][col_offset + x + 4], sgn);
           }
         }
       }
@@ -472,22 +474,22 @@ add_watermark(GimpDrawable* drawable,
           for (y = 1; y <= 2; ++y) {
             int sgn = ((((x + y) % 2) == 0) ? 1 : -1) * add_subtract;
             row_arr[y][col_offset + x] =
-              my_max(0, my_min(255, row_arr[y][col_offset + x] + sgn));
+              add_32(row_arr[y][col_offset + x], sgn);
             row_arr[y + 4][col_offset + x] =
-              my_max(0, my_min(255, row_arr[y + 4][col_offset + x] - sgn));
+              add_32(row_arr[y + 4][col_offset + x], -sgn);
             row_arr[y][col_offset + x + 4] =
-              my_max(0, my_min(255, row_arr[y][col_offset + x + 4] - sgn));
+              add_32(row_arr[y][col_offset + x + 4], -sgn);
             row_arr[y + 4][col_offset + x + 4] =
-              my_max(0, my_min(255, row_arr[y + 4][col_offset + x + 4] + sgn));
+              add_32(row_arr[y + 4][col_offset + x + 4], sgn);
 
             row_arr[x][col_offset + y] =
-              my_max(0, my_min(255, row_arr[x][col_offset + y] + sgn));
+              add_32(row_arr[x][col_offset + y], sgn);
             row_arr[x + 4][col_offset + y] =
-              my_max(0, my_min(255, row_arr[x + 4][col_offset + y] - sgn));
+              add_32(row_arr[x + 4][col_offset + y], -sgn);
             row_arr[x][col_offset + y + 4] =
-              my_max(0, my_min(255, row_arr[x][col_offset + y + 4] - sgn));
+              add_32(row_arr[x][col_offset + y + 4], -sgn);
             row_arr[x + 4][col_offset + y + 4] =
-              my_max(0, my_min(255, row_arr[x + 4][col_offset + y + 4] + sgn));
+              add_32(row_arr[x + 4][col_offset + y + 4], sgn);
           }
         }
       }
