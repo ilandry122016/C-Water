@@ -44,10 +44,27 @@ unsigned char* compressed_data; // Compressed version of the bits used
                                 // for watermarking.
 size_t current_len = 0;
 
+// Add pixel_value with the lowest bits mod 8.
+char
+add_8(char pixel_value, int adjustment)
+{
+  char high_bits = pixel_value & 0xF8;
+  char low_bits = pixel_value & 0x07;
+
+  // Add and only take the low bits. This is equivalent to taking mod 32.
+  low_bits += adjustment;
+  low_bits = low_bits & 0x07;
+
+  // Gives the original high_bits and the new low_bits.
+  return high_bits | low_bits;
+}
+
 // Add pixel_value with the lowest bits mod 32.
 char
 add_32(char pixel_value, int adjustment)
 {
+  return add_8(pixel_value, adjustment);
+  
   char high_bits = pixel_value & 0xE0;
   char low_bits = pixel_value & 0x1F;
 
@@ -63,6 +80,8 @@ add_32(char pixel_value, int adjustment)
 char
 add_64(char pixel_value, int adjustment)
 {
+  return add_8(pixel_value, adjustment);
+  
   char high_bits = pixel_value & 0xC0;
   char low_bits = pixel_value & 0x3F;
 
@@ -264,7 +283,7 @@ add_watermark(GimpDrawable* drawable,
     // Break up into 8x8 subblocks of pixels
 
     for (gint col_offset = 0; col_offset < channels * (x2 - x1);
-         col_offset += 24) {
+         col_offset += 8) {
       int x_block = col_offset / 8; // the column index of each block.
       int y_block = (i - y1) / 8;   // the row index of each block
       // there are channel * width / 8 blocks per row.
@@ -306,7 +325,7 @@ add_watermark(GimpDrawable* drawable,
 
       // Pack the bits to save into orig_value.
       int orig_value =
-        ((abs(G_6_6_central) >> 4) & 1) + ((abs(G_6_6_edge) >> 4) & 2);
+        ((abs(G_6_6_central) >> 2) & 1) + ((abs(G_6_6_edge) >> 2) & 1) * 2;
 
       // Save the bits into the original_bits array.
       //
@@ -370,10 +389,7 @@ add_watermark(GimpDrawable* drawable,
   //
   // initialize encoder
   jbg_enc_init(&se,
-               // TODO: should be 2 * but that does not fit, so divide by 4
                (2 * channels * width / 8),
-               //	       (channels * width / 8) / 4,
-               // width / 4,
                height / 8,
                1,
                bitmaps,
