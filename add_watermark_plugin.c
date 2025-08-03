@@ -220,34 +220,12 @@ add_watermark(GimpDrawable* drawable,
     gimp_pixel_rgn_get_row(
       &rgn_in, row_arr[7], x1, MIN(y2 - 1, i + 7), x2 - x1);
 
-    if (i <= y1 + 127) {
-      /* printf("first row of row_arr: "); */
-      /* for (j = x1; (j < x2) && (j < x1 + 100); ++j){ */
-      /* 	printf("%.2x ", (row_arr[0][j])); */
-      /* } */
-      /* printf("\n"); */
-
-      for (j = 0; j < 8; ++j) {
-        // Hash all of the pixels in the image.
-        blake3_hasher_update(&hasher, row_arr[j], channels * (x2 - x1));
-      }
+    for (j = 0; j < 8; ++j) {
+      // Hash all of the pixels in the image.
+      blake3_hasher_update(&hasher, row_arr[j], channels * (x2 - x1));
     }
-
-    if (i == y1 + 128) {
-      printf("128'th row of row_arr: ");
-      for (j = x1; (j < x2) && (j < x1 + 100); ++j) {
-        printf("%.2x ", (row_arr[0][j]));
-      }
-      printf("\n");
-    }
-
-    /* for (j = 0; j < 8; ++j) { */
-    /*   // Hash all of the pixels in the image. */
-    /*   blake3_hasher_update(&hasher, row_arr[j], channels * (x2 - x1)); */
-    /* } */
 
     // Break up into 8x8 subblocks of pixels
-
     for (gint col_offset = 0; col_offset < channels * (x2 - x1);
          col_offset += 8) {
       int x_block = col_offset / 8; // the column index of each block.
@@ -306,23 +284,6 @@ add_watermark(GimpDrawable* drawable,
       // that byte.
       original_bits[original_bit_index] = original_bits[original_bit_index] |
                                           (orig_value << (sub_block_index * 2));
-
-      // printf("G_6_6_central: %d %d %d %d %d \n", col_offset, i,
-      // G_6_6_central, G_6_6_edge, orig_value);
-      if (i == y1 + 128 && col_offset == 8) {
-        /* printf("\nbit_1_p_alpha: %d \n", bit_1_p_alpha); */
-        /* printf("bit_alpha: %d \n", bit_alpha); */
-        printf("orig_value: %d \n", orig_value);
-        printf("original_bit_index: %d \n", original_bit_index);
-
-        printf("original_bits: %.2x\n", original_bits[original_bit_index]);
-
-        /* printf( */
-        /*   "row_arr: %.2x %.2x\n", */
-        /*   row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset],
-         */
-        /*   row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset]); */
-      }
     }
 
     if (i % 10 == 0)
