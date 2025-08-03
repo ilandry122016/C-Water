@@ -415,12 +415,12 @@ add_watermark(GimpDrawable* drawable,
             int sgn = ((((x + y) % 2) == 0) ? 1 : -1) * add_subtract;
             row_arr[y][col_offset + x] =
               add_8(row_arr[y][col_offset + x], sgn);
-            row_arr[y + 4][col_offset + x] =
-              add_8(row_arr[y + 4][col_offset + x], -sgn);
-            row_arr[y][col_offset + x + 4] =
-              add_8(row_arr[y][col_offset + x + 4], -sgn);
-            row_arr[y + 4][col_offset + x + 4] =
-              add_8(row_arr[y + 4][col_offset + x + 4], sgn);
+            /* row_arr[y + 4][col_offset + x] = */
+            /*   add_8(row_arr[y + 4][col_offset + x], -sgn); */
+            /* row_arr[y][col_offset + x + 4] = */
+            /*   add_8(row_arr[y][col_offset + x + 4], -sgn); */
+            /* row_arr[y + 4][col_offset + x + 4] = */
+            /*   add_8(row_arr[y + 4][col_offset + x + 4], sgn); */
           }
         }
       }
@@ -434,21 +434,21 @@ add_watermark(GimpDrawable* drawable,
             int sgn = ((((x + y) % 2) == 0) ? 1 : -1) * add_subtract;
             row_arr[y][col_offset + x] =
               add_8(row_arr[y][col_offset + x], sgn);
-            row_arr[y + 4][col_offset + x] =
-              add_8(row_arr[y + 4][col_offset + x], -sgn);
-            row_arr[y][col_offset + x + 4] =
-              add_8(row_arr[y][col_offset + x + 4], -sgn);
-            row_arr[y + 4][col_offset + x + 4] =
-              add_8(row_arr[y + 4][col_offset + x + 4], sgn);
+            /* row_arr[y + 4][col_offset + x] = */
+            /*   add_8(row_arr[y + 4][col_offset + x], -sgn); */
+            /* row_arr[y][col_offset + x + 4] = */
+            /*   add_8(row_arr[y][col_offset + x + 4], -sgn); */
+            /* row_arr[y + 4][col_offset + x + 4] = */
+            /*   add_8(row_arr[y + 4][col_offset + x + 4], sgn); */
 
-            row_arr[x][col_offset + y] =
-              add_8(row_arr[x][col_offset + y], sgn);
-            row_arr[x + 4][col_offset + y] =
-              add_8(row_arr[x + 4][col_offset + y], -sgn);
-            row_arr[x][col_offset + y + 4] =
-              add_8(row_arr[x][col_offset + y + 4], -sgn);
-            row_arr[x + 4][col_offset + y + 4] =
-              add_8(row_arr[x + 4][col_offset + y + 4], sgn);
+            /* row_arr[x][col_offset + y] = */
+            /*   add_8(row_arr[x][col_offset + y], sgn); */
+            /* row_arr[x + 4][col_offset + y] = */
+            /*   add_8(row_arr[x + 4][col_offset + y], -sgn); */
+            /* row_arr[x][col_offset + y + 4] = */
+            /*   add_8(row_arr[x][col_offset + y + 4], -sgn); */
+            /* row_arr[x + 4][col_offset + y + 4] = */
+            /*   add_8(row_arr[x + 4][col_offset + y + 4], sgn); */
           }
         }
       }
