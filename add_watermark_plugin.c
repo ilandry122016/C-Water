@@ -59,40 +59,6 @@ add_8(char pixel_value, int adjustment)
   return high_bits | low_bits;
 }
 
-// Add pixel_value with the lowest bits mod 32.
-char
-add_32(char pixel_value, int adjustment)
-{
-  return add_8(pixel_value, adjustment);
-  
-  char high_bits = pixel_value & 0xE0;
-  char low_bits = pixel_value & 0x1F;
-
-  // Add and only take the low bits. This is equivalent to taking mod 32.
-  low_bits += adjustment;
-  low_bits = low_bits & 0x1F;
-
-  // Gives the original high_bits and the new low_bits.
-  return high_bits | low_bits;
-}
-
-// Add pixel_value with the lowest bits mod 64.
-char
-add_64(char pixel_value, int adjustment)
-{
-  return add_8(pixel_value, adjustment);
-  
-  char high_bits = pixel_value & 0xC0;
-  char low_bits = pixel_value & 0x3F;
-
-  // Add and only take the low bits. This is equivalent to taking mod 64.
-  low_bits += adjustment;
-  low_bits = low_bits & 0x3F;
-
-  // Gives the original high_bits and the new low_bits.
-  return high_bits | low_bits;
-}
-
 void
 output_bie(unsigned char* start, size_t len, void* file)
 {
@@ -487,13 +453,13 @@ add_watermark(GimpDrawable* drawable,
           for (y = 1; y <= 2; ++y) {
             int sgn = ((((x + y) % 2) == 0) ? 1 : -1) * add_subtract;
             row_arr[y][col_offset + x] =
-              add_32(row_arr[y][col_offset + x], sgn);
+              add_8(row_arr[y][col_offset + x], sgn);
             row_arr[y + 4][col_offset + x] =
-              add_32(row_arr[y + 4][col_offset + x], -sgn);
+              add_8(row_arr[y + 4][col_offset + x], -sgn);
             row_arr[y][col_offset + x + 4] =
-              add_32(row_arr[y][col_offset + x + 4], -sgn);
+              add_8(row_arr[y][col_offset + x + 4], -sgn);
             row_arr[y + 4][col_offset + x + 4] =
-              add_32(row_arr[y + 4][col_offset + x + 4], sgn);
+              add_8(row_arr[y + 4][col_offset + x + 4], sgn);
           }
         }
       }
@@ -506,22 +472,22 @@ add_watermark(GimpDrawable* drawable,
           for (y = 1; y <= 2; ++y) {
             int sgn = ((((x + y) % 2) == 0) ? 1 : -1) * add_subtract;
             row_arr[y][col_offset + x] =
-              add_64(row_arr[y][col_offset + x], sgn);
+              add_8(row_arr[y][col_offset + x], sgn);
             row_arr[y + 4][col_offset + x] =
-              add_64(row_arr[y + 4][col_offset + x], -sgn);
+              add_8(row_arr[y + 4][col_offset + x], -sgn);
             row_arr[y][col_offset + x + 4] =
-              add_64(row_arr[y][col_offset + x + 4], -sgn);
+              add_8(row_arr[y][col_offset + x + 4], -sgn);
             row_arr[y + 4][col_offset + x + 4] =
-              add_64(row_arr[y + 4][col_offset + x + 4], sgn);
+              add_8(row_arr[y + 4][col_offset + x + 4], sgn);
 
             row_arr[x][col_offset + y] =
-              add_64(row_arr[x][col_offset + y], sgn);
+              add_8(row_arr[x][col_offset + y], sgn);
             row_arr[x + 4][col_offset + y] =
-              add_64(row_arr[x + 4][col_offset + y], -sgn);
+              add_8(row_arr[x + 4][col_offset + y], -sgn);
             row_arr[x][col_offset + y + 4] =
-              add_64(row_arr[x][col_offset + y + 4], -sgn);
+              add_8(row_arr[x][col_offset + y + 4], -sgn);
             row_arr[x + 4][col_offset + y + 4] =
-              add_64(row_arr[x + 4][col_offset + y + 4], sgn);
+              add_8(row_arr[x + 4][col_offset + y + 4], sgn);
           }
         }
       }
