@@ -347,6 +347,18 @@ add_watermark(GimpDrawable* drawable,
          original_bits + BLAKE3_OUT_LEN + current_len,
          original_bits_size - BLAKE3_OUT_LEN - current_len);
 
+  printf("jbg: ");
+  for (i = BLAKE3_OUT_LEN; i < BLAKE3_OUT_LEN + 32; ++i) {
+    printf("%.2x ", new_bits[i]);
+  }
+  printf("\n");
+
+  printf("bit: ");
+  for (i = BLAKE3_OUT_LEN; i < BLAKE3_OUT_LEN + 32; ++i) {
+    printf("%.2x ", original_bits[i]);
+  }
+  printf("\n");
+
   for (i = y1; i < y2; i += 8) {
     /* Get row i through i+7 */
     gimp_pixel_rgn_get_row(&rgn_in, row_arr[0], x1, i, x2 - x1);
@@ -406,6 +418,15 @@ add_watermark(GimpDrawable* drawable,
       int original_bit_1_p_alpha = (original_value & 1);
       int original_bit_alpha = (original_value / 2);
 
+      if (x_block >= 72 && x_block < 90 && y_block == 0) {
+        printf("G: %d %d %d %d %d \n",
+               x_block,
+               y_block,
+               block_index,
+               new_value,
+               original_value);
+      }
+
       if (original_bit_1_p_alpha != bit_1_p_alpha) {
         // If we are adding a bit, then bit_1_p_alpha == 1 and
         // original_bit_1_p_alpha == 0.
@@ -413,8 +434,14 @@ add_watermark(GimpDrawable* drawable,
         for (x = 1; x <= 2; ++x) {
           for (y = 1; y <= 2; ++y) {
             int sgn = ((((x + y) % 2) == 0) ? 1 : -1) * add_subtract;
-            row_arr[y][col_offset + x] =
-              add_8(row_arr[y][col_offset + x], sgn);
+
+            if (x_block >= 72 && x_block < 90 && y_block == 0) {
+              printf(
+                "1_p_alpha: %d %d %d %d \n", x, y, sgn, row_arr[y][col_offset + x]);
+            }
+
+            row_arr[y][col_offset + x] = add_8(row_arr[y][col_offset + x], sgn);
+
             /* row_arr[y + 4][col_offset + x] = */
             /*   add_8(row_arr[y + 4][col_offset + x], -sgn); */
             /* row_arr[y][col_offset + x + 4] = */
@@ -432,8 +459,13 @@ add_watermark(GimpDrawable* drawable,
         for (x = 0; x <= 3; x += 3) {
           for (y = 1; y <= 2; ++y) {
             int sgn = ((((x + y) % 2) == 0) ? 1 : -1) * add_subtract;
-            row_arr[y][col_offset + x] =
-              add_8(row_arr[y][col_offset + x], sgn);
+
+            if (x_block >= 72 && x_block < 90 && y_block == 0) {
+              printf(
+                "alpha: %d %d %d %d \n", x, y, sgn, row_arr[y][col_offset + x]);
+            }
+
+            row_arr[y][col_offset + x] = add_8(row_arr[y][col_offset + x], sgn);
             /* row_arr[y + 4][col_offset + x] = */
             /*   add_8(row_arr[y + 4][col_offset + x], -sgn); */
             /* row_arr[y][col_offset + x + 4] = */
