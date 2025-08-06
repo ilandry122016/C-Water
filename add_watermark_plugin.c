@@ -44,16 +44,16 @@ unsigned char* compressed_data; // Compressed version of the bits used
                                 // for watermarking.
 size_t current_len = 0;
 
-// Add pixel_value with the lowest bits mod 8.
+// Add pixel_value with the lowest bits mod 16.
 char
-add_8(char pixel_value, int adjustment)
+add_16(char pixel_value, int adjustment)
 {
-  char high_bits = pixel_value & 0xF8;
-  char low_bits = pixel_value & 0x07;
+  char high_bits = pixel_value & 0xF0;
+  char low_bits = pixel_value & 0x0F;
 
-  // Add and only take the low bits. This is equivalent to taking mod 32.
+  // Add and only take the low bits. This is equivalent to taking mod 16.
   low_bits += adjustment;
-  low_bits = low_bits & 0x07;
+  low_bits = low_bits & 0x0F;
 
   // Gives the original high_bits and the new low_bits.
   return high_bits | low_bits;
@@ -268,8 +268,11 @@ add_watermark(GimpDrawable* drawable,
       }
 
       // Pack the bits to save into orig_value.
-      int orig_value =
-        ((abs(G_6_6_central) >> 2) & 1) + ((abs(G_6_6_edge) >> 2) & 1) * 2;
+      G_6_6_central = (G_6_6_central + 8192) % 16;
+      G_6_6_edge = (G_6_6_edge + 8192) % 16;
+
+      int orig_value = ((G_6_6_central >= 4 && G_6_6_central < 12) ? 1 : 0) +
+                       ((G_6_6_edge >= 4 && G_6_6_edge < 12) ? 2 : 0);
 
       // Save the bits into the original_bits array.
       //
@@ -418,14 +421,14 @@ add_watermark(GimpDrawable* drawable,
       int original_bit_1_p_alpha = (original_value & 1);
       int original_bit_alpha = (original_value / 2);
 
-      if (x_block >= 72 && x_block < 90 && y_block == 0) {
-        printf("G: %d %d %d %d %d \n",
-               x_block,
-               y_block,
-               block_index,
-               new_value,
-               original_value);
-      }
+      /* if (x_block >= 72 && x_block < 90 && y_block == 0) { */
+      /*   printf("G: %d %d %d %d %d \n", */
+      /*          x_block, */
+      /*          y_block, */
+      /*          block_index, */
+      /*          new_value, */
+      /*          original_value); */
+      /* } */
 
       if (original_bit_1_p_alpha != bit_1_p_alpha) {
         // If we are adding a bit, then bit_1_p_alpha == 1 and
@@ -435,19 +438,22 @@ add_watermark(GimpDrawable* drawable,
           for (y = 1; y <= 2; ++y) {
             int sgn = ((((x + y) % 2) == 0) ? 1 : -1) * add_subtract;
 
-            if (x_block >= 72 && x_block < 90 && y_block == 0) {
-              printf(
-                "1_p_alpha: %d %d %d %d \n", x, y, sgn, row_arr[y][col_offset + x]);
-            }
+            /* if (x_block >= 72 && x_block < 90 && y_block == 0) { */
+            /*   printf("1_p_alpha: %d %d %d %d \n", */
+            /*          x, */
+            /*          y, */
+            /*          sgn, */
+            /*          row_arr[y][col_offset + x]); */
+            /* } */
 
-            row_arr[y][col_offset + x] = add_8(row_arr[y][col_offset + x], sgn);
+            row_arr[y][col_offset + x] = add_16(row_arr[y][col_offset + x], sgn);
 
             /* row_arr[y + 4][col_offset + x] = */
-            /*   add_8(row_arr[y + 4][col_offset + x], -sgn); */
+            /*   add_16(row_arr[y + 4][col_offset + x], -sgn); */
             /* row_arr[y][col_offset + x + 4] = */
-            /*   add_8(row_arr[y][col_offset + x + 4], -sgn); */
+            /*   add_16(row_arr[y][col_offset + x + 4], -sgn); */
             /* row_arr[y + 4][col_offset + x + 4] = */
-            /*   add_8(row_arr[y + 4][col_offset + x + 4], sgn); */
+            /*   add_16(row_arr[y + 4][col_offset + x + 4], sgn); */
           }
         }
       }
@@ -460,27 +466,28 @@ add_watermark(GimpDrawable* drawable,
           for (y = 1; y <= 2; ++y) {
             int sgn = ((((x + y) % 2) == 0) ? 1 : -1) * add_subtract;
 
-            if (x_block >= 72 && x_block < 90 && y_block == 0) {
-              printf(
-                "alpha: %d %d %d %d \n", x, y, sgn, row_arr[y][col_offset + x]);
-            }
+            /* if (x_block >= 72 && x_block < 90 && y_block == 0) { */
+            /*   printf( */
+            /*     "alpha: %d %d %d %d \n", x, y, sgn, row_arr[y][col_offset +
+             * x]); */
+            /* } */
 
-            row_arr[y][col_offset + x] = add_8(row_arr[y][col_offset + x], sgn);
+            row_arr[y][col_offset + x] = add_16(row_arr[y][col_offset + x], sgn);
             /* row_arr[y + 4][col_offset + x] = */
-            /*   add_8(row_arr[y + 4][col_offset + x], -sgn); */
+            /*   add_16(row_arr[y + 4][col_offset + x], -sgn); */
             /* row_arr[y][col_offset + x + 4] = */
-            /*   add_8(row_arr[y][col_offset + x + 4], -sgn); */
+            /*   add_16(row_arr[y][col_offset + x + 4], -sgn); */
             /* row_arr[y + 4][col_offset + x + 4] = */
-            /*   add_8(row_arr[y + 4][col_offset + x + 4], sgn); */
+            /*   add_16(row_arr[y + 4][col_offset + x + 4], sgn); */
 
             /* row_arr[x][col_offset + y] = */
-            /*   add_8(row_arr[x][col_offset + y], sgn); */
+            /*   add_16(row_arr[x][col_offset + y], sgn); */
             /* row_arr[x + 4][col_offset + y] = */
-            /*   add_8(row_arr[x + 4][col_offset + y], -sgn); */
+            /*   add_16(row_arr[x + 4][col_offset + y], -sgn); */
             /* row_arr[x][col_offset + y + 4] = */
-            /*   add_8(row_arr[x][col_offset + y + 4], -sgn); */
+            /*   add_16(row_arr[x][col_offset + y + 4], -sgn); */
             /* row_arr[x + 4][col_offset + y + 4] = */
-            /*   add_8(row_arr[x + 4][col_offset + y + 4], sgn); */
+            /*   add_16(row_arr[x + 4][col_offset + y + 4], sgn); */
           }
         }
       }
