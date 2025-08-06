@@ -187,7 +187,8 @@ add_watermark(GimpDrawable* drawable,
     row_arr[i] = g_new(guchar, channels * (x2 - x1));
   }
 
-  size_t original_bits_size = channels * (width / 8) * (height / 8) / 4;
+  size_t num_blocks = channels * (width / 8) * (height / 8);
+  size_t original_bits_size = num_blocks / 4;
   // We have 3 channels (colors) per pixel, and 8 x 8 pixels per
   // block. We aim to get the number of blocks in the image. For 1024
   // x 1024 images, there are (1024 x 1024) * 3 / (8 x 8) = (2^14) * 3
@@ -197,6 +198,9 @@ add_watermark(GimpDrawable* drawable,
   // 4 results from (2 bits / block) / (8 bits / byte).  The size is
   // for byte addressing.
   original_bits = g_new(guchar, original_bits_size);
+
+  guchar* edge_sign = g_new(guchar, num_blocks);
+  guchar* central_sign = g_new(guchar, num_blocks);
 
   // Initialize the hasher.
   blake3_hasher hasher;
@@ -271,8 +275,22 @@ add_watermark(GimpDrawable* drawable,
       G_6_6_central = (G_6_6_central + 8192) % 16;
       G_6_6_edge = (G_6_6_edge + 8192) % 16;
 
+      central_sign[block_index] =
+        (G_6_6_central >= 8) ? 1 : 0;
+      edge_sign[block_index] = (G_6_6_edge >= 8) ? 1 : 0;
+
       int orig_value = ((G_6_6_central >= 4 && G_6_6_central < 12) ? 1 : 0) +
                        ((G_6_6_edge >= 4 && G_6_6_edge < 12) ? 2 : 0);
+
+      if (x_block < 16 && y_block == 0) {
+        printf("G: %d %d %d %d %d %d \n",
+               x_block,
+               y_block,
+               block_index,
+               G_6_6_central,
+               G_6_6_edge,
+               orig_value);
+      }
 
       // Save the bits into the original_bits array.
       //
@@ -434,6 +452,7 @@ add_watermark(GimpDrawable* drawable,
         // If we are adding a bit, then bit_1_p_alpha == 1 and
         // original_bit_1_p_alpha == 0.
         int add_subtract = (original_bit_1_p_alpha == 0) ? 1 : -1;
+        add_subtract *= (central_sign[block_index] == 0) ? 1 : -1;
         for (x = 1; x <= 2; ++x) {
           for (y = 1; y <= 2; ++y) {
             int sgn = ((((x + y) % 2) == 0) ? 1 : -1) * add_subtract;
@@ -446,7 +465,8 @@ add_watermark(GimpDrawable* drawable,
             /*          row_arr[y][col_offset + x]); */
             /* } */
 
-            row_arr[y][col_offset + x] = add_16(row_arr[y][col_offset + x], sgn);
+            row_arr[y][col_offset + x] =
+              add_16(row_arr[y][col_offset + x], sgn);
 
             /* row_arr[y + 4][col_offset + x] = */
             /*   add_16(row_arr[y + 4][col_offset + x], -sgn); */
@@ -462,17 +482,25 @@ add_watermark(GimpDrawable* drawable,
         // If we are adding a bit, then bit_alpha == 1 and original_bit_alpha ==
         // 0.
         int add_subtract = (original_bit_alpha == 0) ? 1 : -1;
+        add_subtract *= (edge_sign[block_index] == 0) ? 1 : -1;
+
         for (x = 0; x <= 3; x += 3) {
           for (y = 1; y <= 2; ++y) {
             int sgn = ((((x + y) % 2) == 0) ? 1 : -1) * add_subtract;
 
-            /* if (x_block >= 72 && x_block < 90 && y_block == 0) { */
-            /*   printf( */
-            /*     "alpha: %d %d %d %d \n", x, y, sgn, row_arr[y][col_offset +
-             * x]); */
-            /* } */
+            if (x_block == 0 && y_block == 0) {
+              printf("alpha: %d %d %d %d %d %d %d\n",
+                     x,
+                     y,
+                     sgn,
+                     add_subtract,
+                     original_bit_alpha,
+                     edge_sign[block_index],
+                     row_arr[y][col_offset + x]);
+            }
 
-            row_arr[y][col_offset + x] = add_16(row_arr[y][col_offset + x], sgn);
+            row_arr[y][col_offset + x] =
+              add_16(row_arr[y][col_offset + x], sgn);
             /* row_arr[y + 4][col_offset + x] = */
             /*   add_16(row_arr[y + 4][col_offset + x], -sgn); */
             /* row_arr[y][col_offset + x + 4] = */
@@ -493,14 +521,6 @@ add_watermark(GimpDrawable* drawable,
       }
     }
 
-    if (i == y1) {
-      printf("0'th row of row_arr: ");
-      for (j = x1; (j < x2) && (j < x1 + 100); ++j) {
-        printf("%.2x ", (row_arr[0][j]));
-      }
-      printf("\n");
-    }
-
     for (k = 0; k < 8; ++k) {
       gimp_pixel_rgn_set_row(&rgn_out, row_arr[k], x1, i + k, x2 - x1);
     }
@@ -512,6 +532,9 @@ add_watermark(GimpDrawable* drawable,
   for (i = 0; i < 8; ++i) {
     g_free(row_arr[i]);
   }
+
+  g_free(edge_sign);
+  g_free(central_sign);
 
   g_free(original_bits);
   g_free(new_bits);

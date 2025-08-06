@@ -238,19 +238,22 @@ verify_watermark(GimpDrawable* drawable,
       }
 
       // Pack the bits to save into orig_value.
-      int watermark_value =
-        ((abs(G_6_6_central) >> 2) & 1) + ((abs(G_6_6_edge) >> 2) & 1) * 2;
+      G_6_6_central = (G_6_6_central + 8192) % 16;
+      G_6_6_edge = (G_6_6_edge + 8192) % 16;
 
-      if (x_block >= 72 && x_block < 90 && y_block == 0) {
-        printf("G: %d %d %d %d %d %d %d %d \n",
+      int watermark_value =
+        ((G_6_6_central >= 4 && G_6_6_central < 12) ? 1 : 0) +
+        ((G_6_6_edge >= 4 && G_6_6_edge < 12) ? 2 : 0);
+
+      if (x_block < 16 && y_block == 0) {
+        printf("G: %d %d %d %d %d %d \n",
                x_block,
                y_block,
                block_index,
                G_6_6_central,
                G_6_6_edge,
-               watermark_value,
-               ((abs(G_6_6_central) >> 2) & 1),
-               ((abs(G_6_6_edge) >> 2) & 1) * 2);
+               watermark_value);
+               
       }
 
       // Save the bits into the original_bits array.
