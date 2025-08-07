@@ -44,6 +44,21 @@ verify_watermark(GimpDrawable* drawable,
 // unsigned char* compressed_data;
 size_t current_len = 0;
 
+// Add pixel_value with the lowest bits mod 16.
+char
+add_16(char pixel_value, int adjustment)
+{
+  char high_bits = pixel_value & 0xF0;
+  char low_bits = pixel_value & 0x0F;
+
+  // Add and only take the low bits. This is equivalent to taking mod 16.
+  low_bits += adjustment;
+  low_bits = low_bits & 0x0F;
+
+  // Gives the original high_bits and the new low_bits.
+  return high_bits | low_bits;
+}
+
 GimpPlugInInfo PLUG_IN_INFO = { NULL, NULL, query, run };
 
 MAIN()
@@ -164,7 +179,8 @@ verify_watermark(GimpDrawable* drawable,
     row_arr[i] = g_new(guchar, channels * (x2 - x1));
   }
 
-  size_t watermark_bits_size = channels * (width / 8) * (height / 8) / 4;
+  size_t num_blocks = channels * (width / 8) * (height / 8);
+  size_t watermark_bits_size = num_blocks / 4;
   // We have 3 channels (colors) per pixel, and 8 x 8 pixels per
   // block. We aim to get the number of blocks in the image. For 1024
   // x 1024 images, there are (1024 x 1024) * 3 / (8 x 8) = (2^14) * 3
@@ -174,6 +190,9 @@ verify_watermark(GimpDrawable* drawable,
   // 4 results from (2 bits / block) / (8 bits / byte).  The size is
   // for byte addressing.
   watermark_bits = g_new(guchar, watermark_bits_size);
+
+  guchar* edge_sign = g_new(guchar, num_blocks);
+  guchar* central_sign = g_new(guchar, num_blocks);
 
   for (i = y1; i < y2; i += 8) {
     /* Get row i through i+7 */
@@ -241,6 +260,9 @@ verify_watermark(GimpDrawable* drawable,
       G_6_6_central = (G_6_6_central + 8192) % 16;
       G_6_6_edge = (G_6_6_edge + 8192) % 16;
 
+      central_sign[block_index] = (G_6_6_central >= 8) ? 1 : 0;
+      edge_sign[block_index] = (G_6_6_edge >= 8) ? 1 : 0;
+
       int watermark_value =
         ((G_6_6_central >= 4 && G_6_6_central < 12) ? 1 : 0) +
         ((G_6_6_edge >= 4 && G_6_6_edge < 12) ? 2 : 0);
@@ -253,7 +275,6 @@ verify_watermark(GimpDrawable* drawable,
                G_6_6_central,
                G_6_6_edge,
                watermark_value);
-               
       }
 
       // Save the bits into the original_bits array.
@@ -387,20 +408,105 @@ verify_watermark(GimpDrawable* drawable,
       int bit_1_p_alpha = (recovered_value & 1);
       int bit_alpha = (recovered_value / 2);
 
-      // The 1_p_alpha pixel with the lowest bit set to 0.
-      int row_1_p_alpha =
-        (row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset] &
-         0xfe);
+      int watermark_value =
+        (watermark_bits[recovered_bit_index] >> (sub_block_index * 2)) & 3;
+      // Select the new values of the bits for each pixel.
+      //
+      // new_value has two bits. "&" it with 1 to get the lowest
+      // bit. divide by 2 to get the next bit.
+      // The order is arbitrary.
 
-      // The alpha pixel with the lowest bit set to 0.
-      int row_alpha =
-        (row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset] & 0xfe);
+      int watermark_bit_1_p_alpha = (watermark_value & 1);
+      int watermark_bit_alpha = (watermark_value / 2);
+
+      /* // The 1_p_alpha pixel with the lowest bit set to 0. */
+      /* int row_1_p_alpha = */
+      /*   (row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset] &
+       */
+      /*    0xfe); */
+
+      /* // The alpha pixel with the lowest bit set to 0. */
+      /* int row_alpha = */
+      /*   (row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset] & 0xfe);
+       */
+
+      if (watermark_bit_1_p_alpha != bit_1_p_alpha) {
+        // If we are adding a bit, then bit_1_p_alpha == 1 and
+        // original_bit_1_p_alpha == 0.
+        int add_subtract = (watermark_bit_1_p_alpha == 0) ? 1 : -1;
+        add_subtract *= (central_sign[block_index] == 0) ? 1 : -1;
+        for (x = 1; x <= 2; ++x) {
+          for (y = 1; y <= 2; ++y) {
+            int sgn = ((((x + y) % 2) == 0) ? 1 : -1) * add_subtract;
+
+            /* if (x_block >= 72 && x_block < 90 && y_block == 0) { */
+            /*   printf("1_p_alpha: %d %d %d %d \n", */
+            /*          x, */
+            /*          y, */
+            /*          sgn, */
+            /*          row_arr[y][col_offset + x]); */
+            /* } */
+
+            row_arr[y][col_offset + x] =
+              add_16(row_arr[y][col_offset + x], sgn);
+
+            /* row_arr[y + 4][col_offset + x] = */
+            /*   add_16(row_arr[y + 4][col_offset + x], -sgn); */
+            /* row_arr[y][col_offset + x + 4] = */
+            /*   add_16(row_arr[y][col_offset + x + 4], -sgn); */
+            /* row_arr[y + 4][col_offset + x + 4] = */
+            /*   add_16(row_arr[y + 4][col_offset + x + 4], sgn); */
+          }
+        }
+      }
+
+      if (watermark_bit_alpha != bit_alpha) {
+        // If we are adding a bit, then bit_alpha == 1 and original_bit_alpha ==
+        // 0.
+        int add_subtract = (watermark_bit_alpha == 0) ? 1 : -1;
+        add_subtract *= (edge_sign[block_index] == 0) ? 1 : -1;
+
+        for (x = 0; x <= 3; x += 3) {
+          for (y = 1; y <= 2; ++y) {
+            int sgn = ((((x + y) % 2) == 0) ? 1 : -1) * add_subtract;
+
+            if (x_block == 0 && y_block == 0) {
+              printf("alpha: %d %d %d %d %d %d %d\n",
+                     x,
+                     y,
+                     sgn,
+                     add_subtract,
+                     watermark_bit_alpha,
+                     edge_sign[block_index],
+                     row_arr[y][col_offset + x]);
+            }
+
+            row_arr[y][col_offset + x] =
+              add_16(row_arr[y][col_offset + x], sgn);
+            /* row_arr[y + 4][col_offset + x] = */
+            /*   add_16(row_arr[y + 4][col_offset + x], -sgn); */
+            /* row_arr[y][col_offset + x + 4] = */
+            /*   add_16(row_arr[y][col_offset + x + 4], -sgn); */
+            /* row_arr[y + 4][col_offset + x + 4] = */
+            /*   add_16(row_arr[y + 4][col_offset + x + 4], sgn); */
+
+            /* row_arr[x][col_offset + y] = */
+            /*   add_16(row_arr[x][col_offset + y], sgn); */
+            /* row_arr[x + 4][col_offset + y] = */
+            /*   add_16(row_arr[x + 4][col_offset + y], -sgn); */
+            /* row_arr[x][col_offset + y + 4] = */
+            /*   add_16(row_arr[x][col_offset + y + 4], -sgn); */
+            /* row_arr[x + 4][col_offset + y + 4] = */
+            /*   add_16(row_arr[x + 4][col_offset + y + 4], sgn); */
+          }
+        }
+      }
 
       if (i == y1 + 128 && col_offset == 8) {
         printf("\nbit_1_p_alpha: %d \n", bit_1_p_alpha);
         printf("bit_alpha: %d \n", bit_alpha);
-        printf("row_1_p_alpha: %d \n", row_1_p_alpha);
-        printf("row_alpha: %d \n", row_alpha);
+        printf("watermark_bit_1_p_alpha: %d \n", watermark_bit_1_p_alpha);
+        printf("watermark_bit_alpha: %d \n", watermark_bit_alpha);
         printf("recovered_value: %d \n", recovered_value);
         printf("recovered_bit_index: %d \n", recovered_bit_index);
         printf("recovered_bits: %.2x \n", recovered_bits[recovered_bit_index]);
@@ -411,13 +517,13 @@ verify_watermark(GimpDrawable* drawable,
           row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset]);
       }
 
-      // Add the new bit value to the 1_p_alpha pixel.
-      row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset] =
-        (row_1_p_alpha + bit_1_p_alpha);
+      /* // Add the new bit value to the 1_p_alpha pixel. */
+      /* row_arr[y_bit_1_p_alpha_index][x_bit_1_p_alpha_index + col_offset] = */
+      /*   (row_1_p_alpha + bit_1_p_alpha); */
 
-      // Add the new bit value to the alpha pixel.
-      row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset] =
-        (row_alpha + bit_alpha);
+      /* // Add the new bit value to the alpha pixel. */
+      /* row_arr[y_bit_alpha_index][x_bit_alpha_index + col_offset] = */
+      /*   (row_alpha + bit_alpha); */
 
       if (i == y1 + 128 && col_offset == 8) {
         printf(
@@ -430,21 +536,21 @@ verify_watermark(GimpDrawable* drawable,
     for (k = 0; k < 8; ++k) {
       gimp_pixel_rgn_set_row(&rgn_out, row_arr[k], x1, i + k, x2 - x1);
       // Hash all of the pixels in the image.
-      /* blake3_hasher_update(&hasher, row_arr[k], channels * (x2 - x1)); */
+      blake3_hasher_update(&hasher, row_arr[k], channels * (x2 - x1));
     }
 
-    if (i <= y1 + 127) {
-      /* printf("first row of row_arr: "); */
-      /* for (j = x1; (j < x2) && (j < x1 + 100); ++j){ */
-      /* 	printf("%.2x ", (row_arr[0][j])); */
-      /* } */
-      /* printf("\n"); */
+    /* if (i <= y1 + 127) { */
+    /*   /\* printf("first row of row_arr: "); *\/ */
+    /*   /\* for (j = x1; (j < x2) && (j < x1 + 100); ++j){ *\/ */
+    /*   /\* 	printf("%.2x ", (row_arr[0][j])); *\/ */
+    /*   /\* } *\/ */
+    /*   /\* printf("\n"); *\/ */
 
-      for (k = 0; k < 8; ++k) {
-        // Hash all of the pixels in the image.
-        blake3_hasher_update(&hasher, row_arr[k], channels * (x2 - x1));
-      }
-    }
+    /*   for (k = 0; k < 8; ++k) { */
+    /*     // Hash all of the pixels in the image. */
+    /*     blake3_hasher_update(&hasher, row_arr[k], channels * (x2 - x1)); */
+    /*   } */
+    /* } */
 
     if (i == y1 + 128) {
       printf("128'th row of row_arr: ");
