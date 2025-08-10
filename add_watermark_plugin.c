@@ -275,22 +275,11 @@ add_watermark(GimpDrawable* drawable,
       G_6_6_central = (G_6_6_central + 8192) % 16;
       G_6_6_edge = (G_6_6_edge + 8192) % 16;
 
-      central_sign[block_index] =
-        (G_6_6_central >= 8) ? 1 : 0;
+      central_sign[block_index] = (G_6_6_central >= 8) ? 1 : 0;
       edge_sign[block_index] = (G_6_6_edge >= 8) ? 1 : 0;
 
       int orig_value = ((G_6_6_central >= 4 && G_6_6_central < 12) ? 1 : 0) +
                        ((G_6_6_edge >= 4 && G_6_6_edge < 12) ? 2 : 0);
-
-      if (x_block < 16 && y_block == 0) {
-        printf("G: %d %d %d %d %d %d \n",
-               x_block,
-               y_block,
-               block_index,
-               G_6_6_central,
-               G_6_6_edge,
-               orig_value);
-      }
 
       // Save the bits into the original_bits array.
       //
@@ -305,27 +294,42 @@ add_watermark(GimpDrawable* drawable,
       // that byte.
       original_bits[original_bit_index] = original_bits[original_bit_index] |
                                           (orig_value << (sub_block_index * 2));
+
+      if (original_bit_index == BLAKE3_OUT_LEN + 512 + 16 + 7) {
+        printf("original_bit_index: %d %d 0x%.2x %d %d %d \n",
+               original_bit_index,
+               sub_block_index,
+               original_bits[original_bit_index],
+               orig_value,
+               G_6_6_central,
+               G_6_6_edge);
+      }
     }
 
     if (i % 10 == 0)
       gimp_progress_update((gdouble)(i - y1) / (gdouble)(y2 - y1));
   }
 
+  printf("original_bits[567]: 0x%.2x \n", original_bits[567]);
+
   // Finalize the hash. BLAKE3_OUT_LEN is the default output length, 32 bytes.
   uint8_t blake3_hash[BLAKE3_OUT_LEN];
   blake3_hasher_finalize(&hasher, blake3_hash, BLAKE3_OUT_LEN);
 
+  printf("original_bits[567]: 0x%.2x \n", original_bits[567]);
+
   printf("blake3_hash: ");
   for (i = 0; i < BLAKE3_OUT_LEN; ++i) {
-    printf("%.2x ", blake3_hash[i]);
+    printf("0x%.2x ", blake3_hash[i]);
   }
   printf("\n");
 
-  /* for (size_t index = 0; index < original_bits_size; ++index) { */
-  /*   original_bits[index] = 0xAB; */
-  /* } */
-
-  unsigned char* bitmaps[1] = { original_bits };
+  // Make a copy of original bits here because jgb_enc_out will modify input images.
+  unsigned char* copy_bits;
+  copy_bits = g_new(guchar, original_bits_size);
+  memcpy(copy_bits, original_bits, original_bits_size);
+  
+  unsigned char* bitmaps[1] = { copy_bits };
   // TODO: this shouldn't be bigger than original_bits. Otherwise, it won't fit.
   compressed_data = malloc(2 * original_bits_size);
 
@@ -336,6 +340,7 @@ add_watermark(GimpDrawable* drawable,
   // there are 2 bits = 1/4 bytes per block.
   //
   // initialize encoder
+  printf("original_bits[567]: 0x%.2x \n", original_bits[567]);
   jbg_enc_init(&se,
                (2 * channels * width / 8),
                height / 8,
@@ -343,12 +348,15 @@ add_watermark(GimpDrawable* drawable,
                bitmaps,
                output_bie,
                stdout);
+  printf("original_bits[567]: 0x%.2x \n", original_bits[567]);
   jbg_enc_out(&se);  /* encode image */
+  printf("original_bits[567]: 0x%.2x \n", original_bits[567]);
   jbg_enc_free(&se); /* release allocated resources */
 
-  printf("current_len: %d \n", current_len);
-  printf("original_bits_size: %d \n", original_bits_size);
+  printf("original_bits[567]: 0x%.2x \n", original_bits[567]);
 
+  printf("original_bits_size: %d \n", original_bits_size);
+  printf("current_len: %d \n", current_len);
   guchar* new_bits = g_new(guchar, original_bits_size);
 
   // The watermark is the hash of all pixels in the image and the bits
@@ -361,24 +369,71 @@ add_watermark(GimpDrawable* drawable,
   // block.) in a compressed form.
   memcpy(new_bits + BLAKE3_OUT_LEN, compressed_data, current_len);
 
+  printf("original_bits[567]: 0x%.2x \n", original_bits[567]);
+
+  printf("new_bits: ");
+  for (i = BLAKE3_OUT_LEN + 512 + 16; i < BLAKE3_OUT_LEN + 512 + 16 + 8; ++i) {
+    printf("0x%.2x ", new_bits[i]);
+  }
+  printf("\n");
+
   free(compressed_data);
+  free(copy_bits);
 
   // Keep all the rest of the bits the same.
   memcpy(new_bits + BLAKE3_OUT_LEN + current_len,
          original_bits + BLAKE3_OUT_LEN + current_len,
          original_bits_size - BLAKE3_OUT_LEN - current_len);
 
-  printf("jbg: ");
-  for (i = BLAKE3_OUT_LEN; i < BLAKE3_OUT_LEN + 32; ++i) {
-    printf("%.2x ", new_bits[i]);
-  }
-  printf("\n");
+  {
+    // Initialize the hasher.
+    blake3_hasher hasher;
+    blake3_hasher_init(&hasher);
 
-  printf("bit: ");
-  for (i = BLAKE3_OUT_LEN; i < BLAKE3_OUT_LEN + 32; ++i) {
-    printf("%.2x ", original_bits[i]);
+    blake3_hasher_update(&hasher, new_bits + BLAKE3_OUT_LEN + 512 + 16, 8);
+
+    uint8_t blake3_hash[BLAKE3_OUT_LEN];
+    blake3_hasher_finalize(&hasher, blake3_hash, BLAKE3_OUT_LEN);
+
+    printf("new_bits hash: ");
+    for (i = 0; i < BLAKE3_OUT_LEN; ++i) {
+      printf("0x%.2x ", blake3_hash[i]);
+    }
+    printf("\n");
+
+    /* unsigned char* bitmaps[1] = { original_bits }; */
+    /* // TODO: this shouldn't be bigger than 2 * watermark_bits_size.
+     * Otherwise, */
+    /* // it won't fit. compressed_data = malloc(2 * watermark_bits_size); */
+
+    /* struct jbg_dec_state sd; */
+
+    /* jbg_dec_init(&sd); */
+    /* size_t dec_offset; */
+
+    /* printf("Crash point at line 306.\n"); */
+    /* int jbig_result = jbg_dec_in(&sd, */
+    /*                              // original_bits + BLAKE3_OUT_LEN, */
+    /* 				 new_bits + BLAKE3_OUT_LEN, */
+    /* 				 // current_len, */
+    /* 				 original_bits_size - BLAKE3_OUT_LEN, */
+    /*                              /\* watermark_bits_size, *\/ */
+    /*                              &dec_offset); */
+
+    /* printf("jbg_strerror: %s \n", jbg_strerror(jbig_result)); */
+    /* printf("jbig_result: %d \n", jbig_result); */
+
+    /* printf("Crash point at line 314.\n"); */
+    /* int number_of_planes = jbg_dec_getplanes(&sd); */
+
+    /* // Recover the hash and the original bits from the compressed data. */
+    /* printf("Crash point at line 318.\n"); */
+    /* unsigned char* recovered_bits = jbg_dec_getimage(&sd, 0); */
+
+    /* printf("recovered_bits: %p \n", recovered_bits); */
   }
-  printf("\n");
+
+  printf("original_bits[567]: 0x%.2x \n", original_bits[567]);
 
   for (i = y1; i < y2; i += 8) {
     /* Get row i through i+7 */
@@ -439,14 +494,18 @@ add_watermark(GimpDrawable* drawable,
       int original_bit_1_p_alpha = (original_value & 1);
       int original_bit_alpha = (original_value / 2);
 
-      /* if (x_block >= 72 && x_block < 90 && y_block == 0) { */
-      /*   printf("G: %d %d %d %d %d \n", */
-      /*          x_block, */
-      /*          y_block, */
-      /*          block_index, */
-      /*          new_value, */
-      /*          original_value); */
-      /* } */
+      if (original_bit_index == BLAKE3_OUT_LEN + 512 + 16 + 7) {
+        printf("set_bit_index: %d %d 0x%.2x 0x%.2x %d %d %d %d %d \n",
+               original_bit_index,
+               sub_block_index,
+               original_bits[original_bit_index],
+               new_bits[original_bit_index],
+               bit_1_p_alpha,
+               bit_alpha,
+               original_value,
+               original_bit_1_p_alpha,
+               original_bit_alpha);
+      }
 
       if (original_bit_1_p_alpha != bit_1_p_alpha) {
         // If we are adding a bit, then bit_1_p_alpha == 1 and
@@ -457,23 +516,8 @@ add_watermark(GimpDrawable* drawable,
           for (y = 1; y <= 2; ++y) {
             int sgn = ((((x + y) % 2) == 0) ? 1 : -1) * add_subtract;
 
-            /* if (x_block >= 72 && x_block < 90 && y_block == 0) { */
-            /*   printf("1_p_alpha: %d %d %d %d \n", */
-            /*          x, */
-            /*          y, */
-            /*          sgn, */
-            /*          row_arr[y][col_offset + x]); */
-            /* } */
-
             row_arr[y][col_offset + x] =
               add_16(row_arr[y][col_offset + x], sgn);
-
-            /* row_arr[y + 4][col_offset + x] = */
-            /*   add_16(row_arr[y + 4][col_offset + x], -sgn); */
-            /* row_arr[y][col_offset + x + 4] = */
-            /*   add_16(row_arr[y][col_offset + x + 4], -sgn); */
-            /* row_arr[y + 4][col_offset + x + 4] = */
-            /*   add_16(row_arr[y + 4][col_offset + x + 4], sgn); */
           }
         }
       }
@@ -488,34 +532,8 @@ add_watermark(GimpDrawable* drawable,
           for (y = 1; y <= 2; ++y) {
             int sgn = ((((x + y) % 2) == 0) ? 1 : -1) * add_subtract;
 
-            if (x_block == 0 && y_block == 0) {
-              printf("alpha: %d %d %d %d %d %d %d\n",
-                     x,
-                     y,
-                     sgn,
-                     add_subtract,
-                     original_bit_alpha,
-                     edge_sign[block_index],
-                     row_arr[y][col_offset + x]);
-            }
-
             row_arr[y][col_offset + x] =
               add_16(row_arr[y][col_offset + x], sgn);
-            /* row_arr[y + 4][col_offset + x] = */
-            /*   add_16(row_arr[y + 4][col_offset + x], -sgn); */
-            /* row_arr[y][col_offset + x + 4] = */
-            /*   add_16(row_arr[y][col_offset + x + 4], -sgn); */
-            /* row_arr[y + 4][col_offset + x + 4] = */
-            /*   add_16(row_arr[y + 4][col_offset + x + 4], sgn); */
-
-            /* row_arr[x][col_offset + y] = */
-            /*   add_16(row_arr[x][col_offset + y], sgn); */
-            /* row_arr[x + 4][col_offset + y] = */
-            /*   add_16(row_arr[x + 4][col_offset + y], -sgn); */
-            /* row_arr[x][col_offset + y + 4] = */
-            /*   add_16(row_arr[x][col_offset + y + 4], -sgn); */
-            /* row_arr[x + 4][col_offset + y + 4] = */
-            /*   add_16(row_arr[x + 4][col_offset + y + 4], sgn); */
           }
         }
       }
