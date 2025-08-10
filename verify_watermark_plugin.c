@@ -336,7 +336,6 @@ verify_watermark(GimpDrawable* drawable,
   jbg_dec_init(&sd);
   size_t dec_offset;
 
-  printf("Crash point at line 306.\n");
   int jbig_result = jbg_dec_in(&sd,
                                watermark_bits + BLAKE3_OUT_LEN,
                                watermark_bits_size - BLAKE3_OUT_LEN,
@@ -346,22 +345,18 @@ verify_watermark(GimpDrawable* drawable,
   printf("jbg_strerror: %s \n", jbg_strerror(jbig_result));
   printf("jbig_result: %d \n", jbig_result);
 
-  printf("Crash point at line 314.\n");
   int number_of_planes = jbg_dec_getplanes(&sd);
 
   // Recover the hash and the original bits from the compressed data.
-  printf("Crash point at line 318.\n");
   unsigned char* recovered_bits = jbg_dec_getimage(&sd, 0);
 
   printf("recovered_bits: %p \n", recovered_bits);
 
-  printf("Crash point at line 321.\n");
   long result_size = jbg_dec_getsize(&sd);
   printf("result_size: %d \n", result_size);
 
   // Initialize the hasher.
   blake3_hasher hasher;
-  printf("Crash point at line 326.\n");
   blake3_hasher_init(&hasher);
 
   // Restore the original image.
@@ -421,7 +416,6 @@ verify_watermark(GimpDrawable* drawable,
       // We use "& 3" to select the lowest two bits because other
       // bits are for other blocks.
 
-      /* printf("Crash point at line 383.\n"); */
       /* printf("recovered_bit_index: %d \n", recovered_bit_index); */
       /* printf("recovered_bits[%d]: %d", */
       /*        recovered_bit_index, */
@@ -437,7 +431,6 @@ verify_watermark(GimpDrawable* drawable,
       int bit_1_p_alpha = (recovered_value & 1);
       int bit_alpha = (recovered_value / 2);
 
-      /* printf("Crash point at line 393.\n"); */
       int watermark_value =
         (watermark_bits[recovered_bit_index] >> (sub_block_index * 2)) & 3;
       // Select the new values of the bits for each pixel.
@@ -458,7 +451,6 @@ verify_watermark(GimpDrawable* drawable,
           for (y = 1; y <= 2; ++y) {
             int sgn = ((((x + y) % 2) == 0) ? 1 : -1) * add_subtract;
 
-            /* printf("Crash point at line 414.\n"); */
             row_arr[y][col_offset + x] =
               add_16(row_arr[y][col_offset + x], sgn);
           }
@@ -475,7 +467,6 @@ verify_watermark(GimpDrawable* drawable,
           for (y = 1; y <= 2; ++y) {
             int sgn = ((((x + y) % 2) == 0) ? 1 : -1) * add_subtract;
 
-            /* printf("Crash point at line 431.\n"); */
             row_arr[y][col_offset + x] =
               add_16(row_arr[y][col_offset + x], sgn);
           }

@@ -310,13 +310,9 @@ add_watermark(GimpDrawable* drawable,
       gimp_progress_update((gdouble)(i - y1) / (gdouble)(y2 - y1));
   }
 
-  printf("original_bits[567]: 0x%.2x \n", original_bits[567]);
-
   // Finalize the hash. BLAKE3_OUT_LEN is the default output length, 32 bytes.
   uint8_t blake3_hash[BLAKE3_OUT_LEN];
   blake3_hasher_finalize(&hasher, blake3_hash, BLAKE3_OUT_LEN);
-
-  printf("original_bits[567]: 0x%.2x \n", original_bits[567]);
 
   printf("blake3_hash: ");
   for (i = 0; i < BLAKE3_OUT_LEN; ++i) {
@@ -340,7 +336,6 @@ add_watermark(GimpDrawable* drawable,
   // there are 2 bits = 1/4 bytes per block.
   //
   // initialize encoder
-  printf("original_bits[567]: 0x%.2x \n", original_bits[567]);
   jbg_enc_init(&se,
                (2 * channels * width / 8),
                height / 8,
@@ -348,12 +343,10 @@ add_watermark(GimpDrawable* drawable,
                bitmaps,
                output_bie,
                stdout);
-  printf("original_bits[567]: 0x%.2x \n", original_bits[567]);
-  jbg_enc_out(&se);  /* encode image */
-  printf("original_bits[567]: 0x%.2x \n", original_bits[567]);
-  jbg_enc_free(&se); /* release allocated resources */
 
-  printf("original_bits[567]: 0x%.2x \n", original_bits[567]);
+  jbg_enc_out(&se);  /* encode image */
+
+  jbg_enc_free(&se); /* release allocated resources */
 
   printf("original_bits_size: %d \n", original_bits_size);
   printf("current_len: %d \n", current_len);
@@ -368,8 +361,6 @@ add_watermark(GimpDrawable* drawable,
   // Store the bits used for watermarking (2 pixels for each 8 x 8
   // block.) in a compressed form.
   memcpy(new_bits + BLAKE3_OUT_LEN, compressed_data, current_len);
-
-  printf("original_bits[567]: 0x%.2x \n", original_bits[567]);
 
   printf("new_bits: ");
   for (i = BLAKE3_OUT_LEN + 512 + 16; i < BLAKE3_OUT_LEN + 512 + 16 + 8; ++i) {
@@ -432,8 +423,6 @@ add_watermark(GimpDrawable* drawable,
 
     /* printf("recovered_bits: %p \n", recovered_bits); */
   }
-
-  printf("original_bits[567]: 0x%.2x \n", original_bits[567]);
 
   for (i = y1; i < y2; i += 8) {
     /* Get row i through i+7 */
