@@ -282,20 +282,27 @@ verify_watermark(GimpDrawable* drawable,
         watermark_bits[watermark_bit_index] |
         (watermark_value << (sub_block_index * 2));
 
-      if (watermark_bit_index == BLAKE3_OUT_LEN + 512 + 16 + 7) {
-        printf("watermark_bit_index: %d %d %.2x %d %d %d \n",
-               watermark_bit_index,
-               sub_block_index,
-               watermark_bits[watermark_bit_index],
-               watermark_value,
-	       G_6_6_central,
-	       G_6_6_edge);
-      }
+      /* if (watermark_bit_index == BLAKE3_OUT_LEN + 512 + 16 + 7) { */
+      /*   printf("watermark_bit_index: %d %d %.2x %d %d %d \n", */
+      /*          watermark_bit_index, */
+      /*          sub_block_index, */
+      /*          watermark_bits[watermark_bit_index], */
+      /*          watermark_value, */
+      /*          G_6_6_central, */
+      /*          G_6_6_edge); */
+      /* } */
     }
 
     if (i % 10 == 0)
       gimp_progress_update((gdouble)(i - y1) / (gdouble)(y2 - y1));
   }
+
+  /* // Print out the image before verifying. */
+  /* printf("Before verifying: watermark_bits: "); */
+  /* for (i = 0; i < watermark_bits_size; ++i) { */
+  /*   printf("0x%.2x ", watermark_bits[i]); */
+  /* } */
+  /* printf("\n"); */
 
   printf("blake3_hash verify: ");
   for (i = 0; i < BLAKE3_OUT_LEN; ++i) {
@@ -303,29 +310,12 @@ verify_watermark(GimpDrawable* drawable,
   }
   printf("\n");
 
-  printf("watermark_bits: ");
-  for (i = BLAKE3_OUT_LEN + 512 + 16; i < BLAKE3_OUT_LEN + 512 + 16 + 8; ++i) {
-    printf("%.2x ", watermark_bits[i]);
-  }
-  printf("\n");
-
-  {
-    // Initialize the hasher.
-    blake3_hasher hasher;
-    blake3_hasher_init(&hasher);
-
-    blake3_hasher_update(
-      &hasher, watermark_bits + BLAKE3_OUT_LEN + 512 + 16, 8);
-
-    uint8_t blake3_hash[BLAKE3_OUT_LEN];
-    blake3_hasher_finalize(&hasher, blake3_hash, BLAKE3_OUT_LEN);
-
-    printf("watermark_bits hash: ");
-    for (i = 0; i < BLAKE3_OUT_LEN; ++i) {
-      printf("%.2x ", blake3_hash[i]);
-    }
-    printf("\n");
-  }
+  /* printf("watermark_bits: "); */
+  /* for (i = BLAKE3_OUT_LEN + 512 + 16; i < BLAKE3_OUT_LEN + 512 + 16 + 8; ++i)
+   * { */
+  /*   printf("%.2x ", watermark_bits[i]); */
+  /* } */
+  /* printf("\n"); */
 
   unsigned char* bitmaps[1] = { watermark_bits };
   // TODO: this shouldn't be bigger than 2 * watermark_bits_size. Otherwise, it
@@ -350,10 +340,32 @@ verify_watermark(GimpDrawable* drawable,
   // Recover the hash and the original bits from the compressed data.
   unsigned char* recovered_bits = jbg_dec_getimage(&sd, 0);
 
-  printf("recovered_bits: %p \n", recovered_bits);
+  /* printf("recovered_bits: %p \n", recovered_bits); */
 
-  long result_size = jbg_dec_getsize(&sd);
-  printf("result_size: %d \n", result_size);
+  unsigned long result_size = jbg_dec_getsize(&sd);
+  printf("result_size: %ld \n", result_size);
+
+  unsigned long result_width = jbg_dec_getwidth(&sd);
+  unsigned long result_height = jbg_dec_getheight(&sd);
+  printf("result_width: %ld \n", result_width);
+  printf("result_height: %ld \n", result_height);
+
+  {
+    // Initialize the hasher.
+    blake3_hasher hasher;
+    blake3_hasher_init(&hasher);
+
+    blake3_hasher_update(&hasher, recovered_bits, result_size);
+
+    uint8_t blake3_hash[BLAKE3_OUT_LEN];
+    blake3_hasher_finalize(&hasher, blake3_hash, BLAKE3_OUT_LEN);
+
+    printf("recovered_bits hash: ");
+    for (i = 0; i < BLAKE3_OUT_LEN; ++i) {
+      printf("0x%.2x ", blake3_hash[i]);
+    }
+    printf("\n");
+  }
 
   // Initialize the hasher.
   blake3_hasher hasher;
@@ -467,6 +479,19 @@ verify_watermark(GimpDrawable* drawable,
           for (y = 1; y <= 2; ++y) {
             int sgn = ((((x + y) % 2) == 0) ? 1 : -1) * add_subtract;
 
+            if (i == 0 && y == 1 && col_offset == 8192 + 800 + 72 && x == 0) {
+              printf("verify element: %d %d %d %d 0x%.2x %d 0x%.2x %d %d \n",
+                     i,
+                     x,
+                     y,
+                     col_offset,
+                     row_arr[y][col_offset + x],
+                     sgn,
+                     (guchar)(add_16(row_arr[y][col_offset + x], sgn)),
+                     watermark_bit_alpha,
+                     bit_alpha);
+            }
+
             row_arr[y][col_offset + x] =
               add_16(row_arr[y][col_offset + x], sgn);
           }
@@ -478,7 +503,19 @@ verify_watermark(GimpDrawable* drawable,
       gimp_pixel_rgn_set_row(&rgn_out, row_arr[k], x1, i + k, x2 - x1);
       // Hash all of the pixels in the image.
       blake3_hasher_update(&hasher, row_arr[k], channels * (x2 - x1));
+
+      /* if (i == 0 && k == 1) { */
+      /*   blake3_hasher_update(&hasher, row_arr[k] + 8192, 800); */
+      /* } */
     }
+
+    /* if (i == 0) { */
+    /*   printf("verify_row: "); */
+    /*   for (int col = 8192 + 800 + 72; col < channels * (x2 - x1); ++col) { */
+    /*     printf("%.2x ", row_arr[1][col]); */
+    /*   } */
+    /*   printf("\n"); */
+    /* } */
 
     if (i % 10 == 0)
       gimp_progress_update((gdouble)(i - y1) / (gdouble)(y2 - y1));
@@ -490,9 +527,16 @@ verify_watermark(GimpDrawable* drawable,
 
   printf("blake3_hash: ");
   for (i = 0; i < BLAKE3_OUT_LEN; ++i) {
-    printf("%.2x ", blake3_hash[i]);
+    printf("0x%.2x ", blake3_hash[i]);
   }
   printf("\n");
+
+  /* // Print out the image after verifying. */
+  /* printf("After verifying: watermark_bits: "); */
+  /* for (i = 0; i < watermark_bits_size; ++i) { */
+  /*   printf("0x%.2x ", watermark_bits[i]); */
+  /* } */
+  /* printf("\n"); */
 
   for (i = 0; i < 8; ++i) {
     g_free(row_arr[i]);

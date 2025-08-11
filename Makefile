@@ -7,6 +7,9 @@ watermark_whole_image: add_watermark verify_watermark
 watermark_original_image: add_watermark verify_watermark
 	gimp PXL_20221125_205752609.jpg
 
+watermark_32: add_watermark verify_watermark
+	gimp cropped_32.xcf
+
 add_watermark: add_watermark_plugin.c
 	LIBS="-lm -ljbig -L/home/isaac/Documents/C++/BLAKE3_install/lib/ -lblake3" CFLAGS="-g -I/home/isaac/Documents/C++/BLAKE3_install/include/" gimptool-2.0 --install add_watermark_plugin.c
 
