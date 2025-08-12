@@ -167,8 +167,8 @@ verify_watermark(GimpDrawable* drawable,
   width = x2 - x1;
   height = y2 - y1;
 
-  gimp_pixel_rgn_init(&rgn_in, drawable, x1, y1, width, y2 - y1, FALSE, FALSE);
-  gimp_pixel_rgn_init(&rgn_out, drawable, x1, y1, width, y2 - y1, TRUE, TRUE);
+  gimp_pixel_rgn_init(&rgn_in, drawable, x1, y1, width, height, FALSE, FALSE);
+  gimp_pixel_rgn_init(&rgn_out, drawable, x1, y1, width, height, TRUE, TRUE);
 
   const int total_cols = channels * width;
 
@@ -179,7 +179,9 @@ verify_watermark(GimpDrawable* drawable,
   int max_col_32 = total_cols - (total_cols % 32);
   printf("max_col_32: %d \n ", max_col_32);
 
-  size_t num_blocks = channels * (width / 8) * (height / 8);
+  int max_row_8 = height - (height % 8);
+
+  size_t num_blocks = (max_col_32 / 8) * (max_row_8 / 8);
   size_t watermark_bits_size = num_blocks / 4;
   // We have 3 channels (colors) per pixel, and 8 x 8 pixels per
   // block. We aim to get the number of blocks in the image. For 1024
@@ -194,7 +196,7 @@ verify_watermark(GimpDrawable* drawable,
   guchar* edge_sign = g_new(guchar, num_blocks);
   guchar* central_sign = g_new(guchar, num_blocks);
 
-  for (i = y1; i < y2; i += 8) {
+  for (i = y1; i < y1 + max_row_8; i += 8) {
     /* Get row i through i+7 */
     gimp_pixel_rgn_get_row(&rgn_in, row_arr[0], x1, i, width);
     gimp_pixel_rgn_get_row(&rgn_in, row_arr[1], x1, MIN(y2 - 1, i + 1), width);
@@ -275,7 +277,7 @@ verify_watermark(GimpDrawable* drawable,
     }
 
     if (i % 10 == 0)
-      gimp_progress_update((gdouble)(i - y1) / (gdouble)(y2 - y1));
+      gimp_progress_update((gdouble)(i - y1) / (gdouble)(height));
   }
 
   printf("blake3_hash verify: ");
@@ -337,7 +339,7 @@ verify_watermark(GimpDrawable* drawable,
   blake3_hasher_init(&hasher);
 
   // Restore the original image.
-  for (i = y1; i < y2; i += 8) {
+  for (i = y1; i < y1 + max_row_8; i += 8) {
     /* Get row i through i+7 */
     gimp_pixel_rgn_get_row(&rgn_in, row_arr[0], x1, i, width);
     gimp_pixel_rgn_get_row(&rgn_in, row_arr[1], x1, MIN(y2 - 1, i + 1), width);
@@ -456,7 +458,7 @@ verify_watermark(GimpDrawable* drawable,
     }
 
     if (i % 10 == 0)
-      gimp_progress_update((gdouble)(i - y1) / (gdouble)(y2 - y1));
+      gimp_progress_update((gdouble)(i - y1) / (gdouble)(height));
   }
 
   // Finalize the hash. BLAKE3_OUT_LEN is the default output length, 32 bytes.
@@ -475,5 +477,5 @@ verify_watermark(GimpDrawable* drawable,
 
   gimp_drawable_flush(drawable);
   gimp_drawable_merge_shadow(drawable->drawable_id, TRUE);
-  gimp_drawable_update(drawable->drawable_id, x1, y1, width, y2 - y1);
+  gimp_drawable_update(drawable->drawable_id, x1, y1, width, height);
 }

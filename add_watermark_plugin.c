@@ -179,8 +179,8 @@ add_watermark(GimpDrawable* drawable,
   width = x2 - x1;
   height = y2 - y1;
 
-  gimp_pixel_rgn_init(&rgn_in, drawable, x1, y1, width, y2 - y1, FALSE, FALSE);
-  gimp_pixel_rgn_init(&rgn_out, drawable, x1, y1, width, y2 - y1, TRUE, TRUE);
+  gimp_pixel_rgn_init(&rgn_in, drawable, x1, y1, width, height, FALSE, FALSE);
+  gimp_pixel_rgn_init(&rgn_out, drawable, x1, y1, width, height, TRUE, TRUE);
 
   const int total_cols = channels * width;
 
@@ -190,8 +190,10 @@ add_watermark(GimpDrawable* drawable,
 
   int max_col_32 = total_cols - (total_cols % 32);
   printf("max_col_32: %d \n ", max_col_32);
+
+  int max_row_8 = height - (height % 8);
   
-  size_t num_blocks = (max_col_32 / 8) * (height / 8);
+  size_t num_blocks = (max_col_32 / 8) * (max_row_8 / 8);
   size_t original_bits_size = num_blocks / 4;
   printf("channels: %d \n ", channels);
   printf("width: %d \n ", width);
@@ -213,8 +215,8 @@ add_watermark(GimpDrawable* drawable,
   // Initialize the hasher.
   blake3_hasher hasher;
   blake3_hasher_init(&hasher);
-
-  for (i = y1; i < y2; i += 8) {
+  
+  for (i = y1; i < y1 + max_row_8; i += 8) {
     /* Get row i through i+7 */
     gimp_pixel_rgn_get_row(&rgn_in, row_arr[0], x1, i, width);
     gimp_pixel_rgn_get_row(&rgn_in, row_arr[1], x1, MIN(y2 - 1, i + 1), width);
@@ -297,7 +299,7 @@ add_watermark(GimpDrawable* drawable,
     }
 
     if (i % 10 == 0)
-      gimp_progress_update((gdouble)(i - y1) / (gdouble)(y2 - y1));
+      gimp_progress_update((gdouble)(i - y1) / (gdouble)(height));
   }
 
   // Finalize the hash. BLAKE3_OUT_LEN is the default output length, 32 bytes.
@@ -328,7 +330,7 @@ add_watermark(GimpDrawable* drawable,
   //
   // initialize encoder
   jbg_enc_init(
-    &se, (2 * max_col_32 / 8), height / 8, 1, bitmaps, output_bie, stdout);
+    &se, (2 * max_col_32 / 8), max_row_8 / 8, 1, bitmaps, output_bie, stdout);
 
   jbg_enc_out(&se); /* encode image */
 
@@ -356,7 +358,7 @@ add_watermark(GimpDrawable* drawable,
          original_bits + BLAKE3_OUT_LEN + current_len,
          original_bits_size - BLAKE3_OUT_LEN - current_len);
 
-  for (i = y1; i < y2; i += 8) {
+  for (i = y1; i < y1 + max_row_8; i += 8) {
     /* Get row i through i+7 */
     gimp_pixel_rgn_get_row(&rgn_in, row_arr[0], x1, i, width);
     gimp_pixel_rgn_get_row(&rgn_in, row_arr[1], x1, MIN(y2 - 1, i + 1), width);
@@ -466,7 +468,7 @@ add_watermark(GimpDrawable* drawable,
     }
 
     if (i % 10 == 0)
-      gimp_progress_update((gdouble)(i - y1) / (gdouble)(y2 - y1));
+      gimp_progress_update((gdouble)(i - y1) / (gdouble)(height));
   }
 
   {
@@ -498,5 +500,5 @@ add_watermark(GimpDrawable* drawable,
 
   gimp_drawable_flush(drawable);
   gimp_drawable_merge_shadow(drawable->drawable_id, TRUE);
-  gimp_drawable_update(drawable->drawable_id, x1, y1, width, y2 - y1);
+  gimp_drawable_update(drawable->drawable_id, x1, y1, width, height);
 }
