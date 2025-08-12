@@ -39,10 +39,6 @@ verify_watermark(GimpDrawable* drawable,
                  gint channels);
 
 // global variables
-// unsigned char compressed_data[10000]; // Compressed version of the bits used
-// for watermarking.
-// unsigned char* compressed_data;
-// size_t current_len = 0;
 
 // Add pixel_value with the lowest bits mod 16.
 char
@@ -171,13 +167,17 @@ verify_watermark(GimpDrawable* drawable,
   width = x2 - x1;
   height = y2 - y1;
 
-  gimp_pixel_rgn_init(
-    &rgn_in, drawable, x1, y1, x2 - x1, y2 - y1, FALSE, FALSE);
-  gimp_pixel_rgn_init(&rgn_out, drawable, x1, y1, x2 - x1, y2 - y1, TRUE, TRUE);
+  gimp_pixel_rgn_init(&rgn_in, drawable, x1, y1, width, y2 - y1, FALSE, FALSE);
+  gimp_pixel_rgn_init(&rgn_out, drawable, x1, y1, width, y2 - y1, TRUE, TRUE);
+
+  const int total_cols = channels * width;
 
   for (int i = 0; i < 8; ++i) {
-    row_arr[i] = g_new(guchar, channels * (x2 - x1));
+    row_arr[i] = g_new(guchar, total_cols);
   }
+
+  int max_col_32 = total_cols - (total_cols % 32);
+  printf("max_col_32: %d \n ", max_col_32);
 
   size_t num_blocks = channels * (width / 8) * (height / 8);
   size_t watermark_bits_size = num_blocks / 4;
@@ -196,31 +196,22 @@ verify_watermark(GimpDrawable* drawable,
 
   for (i = y1; i < y2; i += 8) {
     /* Get row i through i+7 */
-    gimp_pixel_rgn_get_row(&rgn_in, row_arr[0], x1, i, x2 - x1);
-    gimp_pixel_rgn_get_row(
-      &rgn_in, row_arr[1], x1, MIN(y2 - 1, i + 1), x2 - x1);
-    gimp_pixel_rgn_get_row(
-      &rgn_in, row_arr[2], x1, MIN(y2 - 1, i + 2), x2 - x1);
-    gimp_pixel_rgn_get_row(
-      &rgn_in, row_arr[3], x1, MIN(y2 - 1, i + 3), x2 - x1);
-    gimp_pixel_rgn_get_row(
-      &rgn_in, row_arr[4], x1, MIN(y2 - 1, i + 4), x2 - x1);
-    gimp_pixel_rgn_get_row(
-      &rgn_in, row_arr[5], x1, MIN(y2 - 1, i + 5), x2 - x1);
-    gimp_pixel_rgn_get_row(
-      &rgn_in, row_arr[6], x1, MIN(y2 - 1, i + 6), x2 - x1);
-    gimp_pixel_rgn_get_row(
-      &rgn_in, row_arr[7], x1, MIN(y2 - 1, i + 7), x2 - x1);
+    gimp_pixel_rgn_get_row(&rgn_in, row_arr[0], x1, i, width);
+    gimp_pixel_rgn_get_row(&rgn_in, row_arr[1], x1, MIN(y2 - 1, i + 1), width);
+    gimp_pixel_rgn_get_row(&rgn_in, row_arr[2], x1, MIN(y2 - 1, i + 2), width);
+    gimp_pixel_rgn_get_row(&rgn_in, row_arr[3], x1, MIN(y2 - 1, i + 3), width);
+    gimp_pixel_rgn_get_row(&rgn_in, row_arr[4], x1, MIN(y2 - 1, i + 4), width);
+    gimp_pixel_rgn_get_row(&rgn_in, row_arr[5], x1, MIN(y2 - 1, i + 5), width);
+    gimp_pixel_rgn_get_row(&rgn_in, row_arr[6], x1, MIN(y2 - 1, i + 6), width);
+    gimp_pixel_rgn_get_row(&rgn_in, row_arr[7], x1, MIN(y2 - 1, i + 7), width);
 
     // Break up into 8x8 subblocks of pixels
 
-    for (gint col_offset = 0; col_offset < channels * (x2 - x1);
-         col_offset += 8) {
+    for (gint col_offset = 0; col_offset < max_col_32; col_offset += 8) {
       int x_block = col_offset / 8; // the column index of each block.
-      int y_block =
-        (i - y1) / 8; // the row index of each block
-                      // there are channel * width / 8 blocks per row.
-      int block_index = x_block + y_block * channels * width / 8;
+      int y_block = (i - y1) / 8;   // the row index of each block
+                                    // there are max_col_32 / 8 blocks per row.
+      int block_index = x_block + y_block * max_col_32 / 8;
 
       // 2 bits per block are used. Gives the byte for the block.
       int watermark_bit_index = block_index / 4;
@@ -281,41 +272,17 @@ verify_watermark(GimpDrawable* drawable,
       watermark_bits[watermark_bit_index] =
         watermark_bits[watermark_bit_index] |
         (watermark_value << (sub_block_index * 2));
-
-      /* if (watermark_bit_index == BLAKE3_OUT_LEN + 512 + 16 + 7) { */
-      /*   printf("watermark_bit_index: %d %d %.2x %d %d %d \n", */
-      /*          watermark_bit_index, */
-      /*          sub_block_index, */
-      /*          watermark_bits[watermark_bit_index], */
-      /*          watermark_value, */
-      /*          G_6_6_central, */
-      /*          G_6_6_edge); */
-      /* } */
     }
 
     if (i % 10 == 0)
       gimp_progress_update((gdouble)(i - y1) / (gdouble)(y2 - y1));
   }
 
-  /* // Print out the image before verifying. */
-  /* printf("Before verifying: watermark_bits: "); */
-  /* for (i = 0; i < watermark_bits_size; ++i) { */
-  /*   printf("0x%.2x ", watermark_bits[i]); */
-  /* } */
-  /* printf("\n"); */
-
   printf("blake3_hash verify: ");
   for (i = 0; i < BLAKE3_OUT_LEN; ++i) {
     printf("%.2x ", watermark_bits[i]);
   }
   printf("\n");
-
-  /* printf("watermark_bits: "); */
-  /* for (i = BLAKE3_OUT_LEN + 512 + 16; i < BLAKE3_OUT_LEN + 512 + 16 + 8; ++i)
-   * { */
-  /*   printf("%.2x ", watermark_bits[i]); */
-  /* } */
-  /* printf("\n"); */
 
   unsigned char* bitmaps[1] = { watermark_bits };
   // TODO: this shouldn't be bigger than 2 * watermark_bits_size. Otherwise, it
@@ -339,8 +306,6 @@ verify_watermark(GimpDrawable* drawable,
 
   // Recover the hash and the original bits from the compressed data.
   unsigned char* recovered_bits = jbg_dec_getimage(&sd, 0);
-
-  /* printf("recovered_bits: %p \n", recovered_bits); */
 
   unsigned long result_size = jbg_dec_getsize(&sd);
   printf("result_size: %ld \n", result_size);
@@ -374,33 +339,22 @@ verify_watermark(GimpDrawable* drawable,
   // Restore the original image.
   for (i = y1; i < y2; i += 8) {
     /* Get row i through i+7 */
-    gimp_pixel_rgn_get_row(&rgn_in, row_arr[0], x1, i, x2 - x1);
-    gimp_pixel_rgn_get_row(
-      &rgn_in, row_arr[1], x1, MIN(y2 - 1, i + 1), x2 - x1);
-    gimp_pixel_rgn_get_row(
-      &rgn_in, row_arr[2], x1, MIN(y2 - 1, i + 2), x2 - x1);
-    gimp_pixel_rgn_get_row(
-      &rgn_in, row_arr[3], x1, MIN(y2 - 1, i + 3), x2 - x1);
-    gimp_pixel_rgn_get_row(
-      &rgn_in, row_arr[4], x1, MIN(y2 - 1, i + 4), x2 - x1);
-    gimp_pixel_rgn_get_row(
-      &rgn_in, row_arr[5], x1, MIN(y2 - 1, i + 5), x2 - x1);
-    gimp_pixel_rgn_get_row(
-      &rgn_in, row_arr[6], x1, MIN(y2 - 1, i + 6), x2 - x1);
-    gimp_pixel_rgn_get_row(
-      &rgn_in, row_arr[7], x1, MIN(y2 - 1, i + 7), x2 - x1);
+    gimp_pixel_rgn_get_row(&rgn_in, row_arr[0], x1, i, width);
+    gimp_pixel_rgn_get_row(&rgn_in, row_arr[1], x1, MIN(y2 - 1, i + 1), width);
+    gimp_pixel_rgn_get_row(&rgn_in, row_arr[2], x1, MIN(y2 - 1, i + 2), width);
+    gimp_pixel_rgn_get_row(&rgn_in, row_arr[3], x1, MIN(y2 - 1, i + 3), width);
+    gimp_pixel_rgn_get_row(&rgn_in, row_arr[4], x1, MIN(y2 - 1, i + 4), width);
+    gimp_pixel_rgn_get_row(&rgn_in, row_arr[5], x1, MIN(y2 - 1, i + 5), width);
+    gimp_pixel_rgn_get_row(&rgn_in, row_arr[6], x1, MIN(y2 - 1, i + 6), width);
+    gimp_pixel_rgn_get_row(&rgn_in, row_arr[7], x1, MIN(y2 - 1, i + 7), width);
 
     // Break up into 8x8 subblocks of pixels
-    for (gint col_offset = 0; col_offset < channels * (x2 - x1);
-         col_offset += 8) {
+    for (gint col_offset = 0; col_offset < max_col_32; col_offset += 8) {
       int x_block = col_offset / 8; // the column index of each block.
       int y_block = (i - y1) / 8;   // the row index of each block
       int block_index =
-        x_block + y_block * channels * width /
-                    8; // there are channel * width / 8 blocks per row.
-
-      /* printf("x_block: %d \n", x_block); */
-      /* printf("y_block: %d \n", y_block); */
+        x_block +
+        y_block * max_col_32 / 8; // there are max_col_32 / 8 blocks per row.
 
       // 2 bits per block are used. Gives the byte for the block.
       int recovered_bit_index = block_index / 4;
@@ -428,10 +382,6 @@ verify_watermark(GimpDrawable* drawable,
       // We use "& 3" to select the lowest two bits because other
       // bits are for other blocks.
 
-      /* printf("recovered_bit_index: %d \n", recovered_bit_index); */
-      /* printf("recovered_bits[%d]: %d", */
-      /*        recovered_bit_index, */
-      /*        recovered_bits[recovered_bit_index]); */
       int recovered_value =
         (recovered_bits[recovered_bit_index] >> (sub_block_index * 2)) & 3;
 
@@ -500,22 +450,10 @@ verify_watermark(GimpDrawable* drawable,
     }
 
     for (k = 0; k < 8; ++k) {
-      gimp_pixel_rgn_set_row(&rgn_out, row_arr[k], x1, i + k, x2 - x1);
+      gimp_pixel_rgn_set_row(&rgn_out, row_arr[k], x1, i + k, width);
       // Hash all of the pixels in the image.
-      blake3_hasher_update(&hasher, row_arr[k], channels * (x2 - x1));
-
-      /* if (i == 0 && k == 1) { */
-      /*   blake3_hasher_update(&hasher, row_arr[k] + 8192, 800); */
-      /* } */
+      blake3_hasher_update(&hasher, row_arr[k], total_cols);
     }
-
-    /* if (i == 0) { */
-    /*   printf("verify_row: "); */
-    /*   for (int col = 8192 + 800 + 72; col < channels * (x2 - x1); ++col) { */
-    /*     printf("%.2x ", row_arr[1][col]); */
-    /*   } */
-    /*   printf("\n"); */
-    /* } */
 
     if (i % 10 == 0)
       gimp_progress_update((gdouble)(i - y1) / (gdouble)(y2 - y1));
@@ -531,18 +469,11 @@ verify_watermark(GimpDrawable* drawable,
   }
   printf("\n");
 
-  /* // Print out the image after verifying. */
-  /* printf("After verifying: watermark_bits: "); */
-  /* for (i = 0; i < watermark_bits_size; ++i) { */
-  /*   printf("0x%.2x ", watermark_bits[i]); */
-  /* } */
-  /* printf("\n"); */
-
   for (i = 0; i < 8; ++i) {
     g_free(row_arr[i]);
   }
 
   gimp_drawable_flush(drawable);
   gimp_drawable_merge_shadow(drawable->drawable_id, TRUE);
-  gimp_drawable_update(drawable->drawable_id, x1, y1, x2 - x1, y2 - y1);
+  gimp_drawable_update(drawable->drawable_id, x1, y1, width, y2 - y1);
 }

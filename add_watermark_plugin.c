@@ -179,20 +179,24 @@ add_watermark(GimpDrawable* drawable,
   width = x2 - x1;
   height = y2 - y1;
 
-  gimp_pixel_rgn_init(
-    &rgn_in, drawable, x1, y1, x2 - x1, y2 - y1, FALSE, FALSE);
-  gimp_pixel_rgn_init(&rgn_out, drawable, x1, y1, x2 - x1, y2 - y1, TRUE, TRUE);
+  gimp_pixel_rgn_init(&rgn_in, drawable, x1, y1, width, y2 - y1, FALSE, FALSE);
+  gimp_pixel_rgn_init(&rgn_out, drawable, x1, y1, width, y2 - y1, TRUE, TRUE);
+
+  const int total_cols = channels * width;
 
   for (int i = 0; i < 8; ++i) {
-    row_arr[i] = g_new(guchar, channels * (x2 - x1));
+    row_arr[i] = g_new(guchar, total_cols);
   }
 
-  size_t num_blocks = channels * (width / 8) * (height / 8);
+  int max_col_32 = total_cols - (total_cols % 32);
+  printf("max_col_32: %d \n ", max_col_32);
+  
+  size_t num_blocks = (max_col_32 / 8) * (height / 8);
   size_t original_bits_size = num_blocks / 4;
   printf("channels: %d \n ", channels);
   printf("width: %d \n ", width);
   printf("height: %d \n ", height);
-  printf("num_blocks: %d \n ", num_blocks);
+  printf("num_blocks: %ld \n ", num_blocks);
   // We have 3 channels (colors) per pixel, and 8 x 8 pixels per
   // block. We aim to get the number of blocks in the image. For 1024
   // x 1024 images, there are (1024 x 1024) * 3 / (8 x 8) = (2^14) * 3
@@ -212,38 +216,26 @@ add_watermark(GimpDrawable* drawable,
 
   for (i = y1; i < y2; i += 8) {
     /* Get row i through i+7 */
-    gimp_pixel_rgn_get_row(&rgn_in, row_arr[0], x1, i, x2 - x1);
-    gimp_pixel_rgn_get_row(
-      &rgn_in, row_arr[1], x1, MIN(y2 - 1, i + 1), x2 - x1);
-    gimp_pixel_rgn_get_row(
-      &rgn_in, row_arr[2], x1, MIN(y2 - 1, i + 2), x2 - x1);
-    gimp_pixel_rgn_get_row(
-      &rgn_in, row_arr[3], x1, MIN(y2 - 1, i + 3), x2 - x1);
-    gimp_pixel_rgn_get_row(
-      &rgn_in, row_arr[4], x1, MIN(y2 - 1, i + 4), x2 - x1);
-    gimp_pixel_rgn_get_row(
-      &rgn_in, row_arr[5], x1, MIN(y2 - 1, i + 5), x2 - x1);
-    gimp_pixel_rgn_get_row(
-      &rgn_in, row_arr[6], x1, MIN(y2 - 1, i + 6), x2 - x1);
-    gimp_pixel_rgn_get_row(
-      &rgn_in, row_arr[7], x1, MIN(y2 - 1, i + 7), x2 - x1);
+    gimp_pixel_rgn_get_row(&rgn_in, row_arr[0], x1, i, width);
+    gimp_pixel_rgn_get_row(&rgn_in, row_arr[1], x1, MIN(y2 - 1, i + 1), width);
+    gimp_pixel_rgn_get_row(&rgn_in, row_arr[2], x1, MIN(y2 - 1, i + 2), width);
+    gimp_pixel_rgn_get_row(&rgn_in, row_arr[3], x1, MIN(y2 - 1, i + 3), width);
+    gimp_pixel_rgn_get_row(&rgn_in, row_arr[4], x1, MIN(y2 - 1, i + 4), width);
+    gimp_pixel_rgn_get_row(&rgn_in, row_arr[5], x1, MIN(y2 - 1, i + 5), width);
+    gimp_pixel_rgn_get_row(&rgn_in, row_arr[6], x1, MIN(y2 - 1, i + 6), width);
+    gimp_pixel_rgn_get_row(&rgn_in, row_arr[7], x1, MIN(y2 - 1, i + 7), width);
 
     for (j = 0; j < 8; ++j) {
       // Hash all of the pixels in the image.
-      /* if (i == 0 && j == 1) { */
-      /*   blake3_hasher_update(&hasher, row_arr[j] + 8192, 800); */
-      /* } */
-
-      blake3_hasher_update(&hasher, row_arr[j], channels * (x2 - x1));
+      blake3_hasher_update(&hasher, row_arr[j], total_cols);
     }
 
     // Break up into 8x8 subblocks of pixels
-    for (gint col_offset = 0; col_offset < channels * (x2 - x1);
-         col_offset += 8) {
+    for (gint col_offset = 0; col_offset < max_col_32; col_offset += 8) {
       int x_block = col_offset / 8; // the column index of each block.
       int y_block = (i - y1) / 8;   // the row index of each block
-      // there are channel * width / 8 blocks per row.
-      int block_index = x_block + y_block * channels * width / 8;
+      // there are max_col_32 / 8 blocks per row.
+      int block_index = x_block + y_block * max_col_32 / 8;
 
       // 2 bits per block are used. Gives the byte for the block.
       int original_bit_index = block_index / 4;
@@ -302,36 +294,11 @@ add_watermark(GimpDrawable* drawable,
       // that byte.
       original_bits[original_bit_index] = original_bits[original_bit_index] |
                                           (orig_value << (sub_block_index * 2));
-
-      /* if (original_bit_index == BLAKE3_OUT_LEN + 512 + 16 + 7) { */
-      /*   printf("original_bit_index: %d %d 0x%.2x %d %d %d \n", */
-      /*          original_bit_index, */
-      /*          sub_block_index, */
-      /*          original_bits[original_bit_index], */
-      /*          orig_value, */
-      /*          G_6_6_central, */
-      /*          G_6_6_edge); */
-      /* } */
     }
-
-    /* if (i == 0) { */
-    /*   printf("add_row: "); */
-    /*   for (int col = 8192 + 800 + 72; col < channels * (x2 - x1); ++col) { */
-    /*     printf("%.2x ", row_arr[1][col]); */
-    /*   } */
-    /*   printf("\n"); */
-    /* } */
 
     if (i % 10 == 0)
       gimp_progress_update((gdouble)(i - y1) / (gdouble)(y2 - y1));
   }
-
-  /* // Print out the image before watermarking. */
-  /* printf("Before watermarking: original_bits: "); */
-  /* for (i = 0; i < original_bits_size; ++i) { */
-  /*   printf("0x%.2x ", original_bits[i]); */
-  /* } */
-  /* printf("\n"); */
 
   // Finalize the hash. BLAKE3_OUT_LEN is the default output length, 32 bytes.
   uint8_t blake3_hash[BLAKE3_OUT_LEN];
@@ -355,18 +322,13 @@ add_watermark(GimpDrawable* drawable,
 
   struct jbg_enc_state se;
 
-  // We choose (channels * width / 8) / 4 for the width in
-  // jbg_enc_init because there are channels * width / 8 blocks, and
-  // there are 2 bits = 1/4 bytes per block.
+  // We choose 2 * (max_col_32 / 8) for the width in
+  // jbg_enc_init because there are max_col_32 / 8 blocks, and
+  // there are 2 bits per block.
   //
   // initialize encoder
-  jbg_enc_init(&se,
-               (2 * channels * width / 8),
-               height / 8,
-               1,
-               bitmaps,
-               output_bie,
-               stdout);
+  jbg_enc_init(
+    &se, (2 * max_col_32 / 8), height / 8, 1, bitmaps, output_bie, stdout);
 
   jbg_enc_out(&se); /* encode image */
 
@@ -386,13 +348,6 @@ add_watermark(GimpDrawable* drawable,
   // block.) in a compressed form.
   memcpy(new_bits + BLAKE3_OUT_LEN, compressed_data, current_len);
 
-  /* printf("new_bits: "); */
-  /* for (i = BLAKE3_OUT_LEN + 512 + 16; i < BLAKE3_OUT_LEN + 512 + 16 + 8; ++i)
-   * { */
-  /*   printf("0x%.2x ", new_bits[i]); */
-  /* } */
-  /* printf("\n"); */
-
   free(compressed_data);
   free(copy_bits);
 
@@ -403,30 +358,23 @@ add_watermark(GimpDrawable* drawable,
 
   for (i = y1; i < y2; i += 8) {
     /* Get row i through i+7 */
-    gimp_pixel_rgn_get_row(&rgn_in, row_arr[0], x1, i, x2 - x1);
-    gimp_pixel_rgn_get_row(
-      &rgn_in, row_arr[1], x1, MIN(y2 - 1, i + 1), x2 - x1);
-    gimp_pixel_rgn_get_row(
-      &rgn_in, row_arr[2], x1, MIN(y2 - 1, i + 2), x2 - x1);
-    gimp_pixel_rgn_get_row(
-      &rgn_in, row_arr[3], x1, MIN(y2 - 1, i + 3), x2 - x1);
-    gimp_pixel_rgn_get_row(
-      &rgn_in, row_arr[4], x1, MIN(y2 - 1, i + 4), x2 - x1);
-    gimp_pixel_rgn_get_row(
-      &rgn_in, row_arr[5], x1, MIN(y2 - 1, i + 5), x2 - x1);
-    gimp_pixel_rgn_get_row(
-      &rgn_in, row_arr[6], x1, MIN(y2 - 1, i + 6), x2 - x1);
-    gimp_pixel_rgn_get_row(
-      &rgn_in, row_arr[7], x1, MIN(y2 - 1, i + 7), x2 - x1);
+    gimp_pixel_rgn_get_row(&rgn_in, row_arr[0], x1, i, width);
+    gimp_pixel_rgn_get_row(&rgn_in, row_arr[1], x1, MIN(y2 - 1, i + 1), width);
+    gimp_pixel_rgn_get_row(&rgn_in, row_arr[2], x1, MIN(y2 - 1, i + 2), width);
+    gimp_pixel_rgn_get_row(&rgn_in, row_arr[3], x1, MIN(y2 - 1, i + 3), width);
+    gimp_pixel_rgn_get_row(&rgn_in, row_arr[4], x1, MIN(y2 - 1, i + 4), width);
+    gimp_pixel_rgn_get_row(&rgn_in, row_arr[5], x1, MIN(y2 - 1, i + 5), width);
+    gimp_pixel_rgn_get_row(&rgn_in, row_arr[6], x1, MIN(y2 - 1, i + 6), width);
+    gimp_pixel_rgn_get_row(&rgn_in, row_arr[7], x1, MIN(y2 - 1, i + 7), width);
 
     // Break up into 8x8 subblocks of pixels
-    for (gint col_offset = 0; col_offset < channels * (x2 - x1);
+    for (gint col_offset = 0; col_offset < max_col_32;
          col_offset += 8) {
       int x_block = col_offset / 8; // the column index of each block.
       int y_block = (i - y1) / 8;   // the row index of each block
       int block_index =
-        x_block + y_block * channels * width /
-                    8; // there are channel * width / 8 blocks per row.
+        x_block + y_block * max_col_32 /
+                    8; // there are max_col_32 / 8 blocks per row.
 
       // 2 bits per block are used. Gives the byte for the block.
       int original_bit_index = block_index / 4;
@@ -459,19 +407,6 @@ add_watermark(GimpDrawable* drawable,
 
       int original_bit_1_p_alpha = (original_value & 1);
       int original_bit_alpha = (original_value / 2);
-
-      /* if (original_bit_index == BLAKE3_OUT_LEN + 512 + 16 + 7) { */
-      /*   printf("set_bit_index: %d %d 0x%.2x 0x%.2x %d %d %d %d %d \n", */
-      /*          original_bit_index, */
-      /*          sub_block_index, */
-      /*          original_bits[original_bit_index], */
-      /*          new_bits[original_bit_index], */
-      /*          bit_1_p_alpha, */
-      /*          bit_alpha, */
-      /*          original_value, */
-      /*          original_bit_1_p_alpha, */
-      /*          original_bit_alpha); */
-      /* } */
 
       if (original_bit_1_p_alpha != bit_1_p_alpha) {
         // If we are adding a bit, then bit_1_p_alpha == 1 and
@@ -527,19 +462,12 @@ add_watermark(GimpDrawable* drawable,
     }
 
     for (k = 0; k < 8; ++k) {
-      gimp_pixel_rgn_set_row(&rgn_out, row_arr[k], x1, i + k, x2 - x1);
+      gimp_pixel_rgn_set_row(&rgn_out, row_arr[k], x1, i + k, width);
     }
 
     if (i % 10 == 0)
       gimp_progress_update((gdouble)(i - y1) / (gdouble)(y2 - y1));
   }
-
-  /* // Print out the image after watermarking. */
-  /* printf("After watermarking: original_bits: "); */
-  /* for (i = 0; i < 32; ++i) { */
-  /*   printf("0x%.2x ", original_bits[i]); */
-  /* } */
-  /* printf("\n"); */
 
   {
     // Initialize the hasher.
@@ -570,5 +498,5 @@ add_watermark(GimpDrawable* drawable,
 
   gimp_drawable_flush(drawable);
   gimp_drawable_merge_shadow(drawable->drawable_id, TRUE);
-  gimp_drawable_update(drawable->drawable_id, x1, y1, x2 - x1, y2 - y1);
+  gimp_drawable_update(drawable->drawable_id, x1, y1, width, y2 - y1);
 }
