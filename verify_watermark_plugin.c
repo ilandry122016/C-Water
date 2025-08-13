@@ -431,19 +431,6 @@ verify_watermark(GimpDrawable* drawable,
           for (y = 1; y <= 2; ++y) {
             int sgn = ((((x + y) % 2) == 0) ? 1 : -1) * add_subtract;
 
-            if (i == 0 && y == 1 && col_offset == 8192 + 800 + 72 && x == 0) {
-              printf("verify element: %d %d %d %d 0x%.2x %d 0x%.2x %d %d \n",
-                     i,
-                     x,
-                     y,
-                     col_offset,
-                     row_arr[y][col_offset + x],
-                     sgn,
-                     (guchar)(add_16(row_arr[y][col_offset + x], sgn)),
-                     watermark_bit_alpha,
-                     bit_alpha);
-            }
-
             row_arr[y][col_offset + x] =
               add_16(row_arr[y][col_offset + x], sgn);
           }

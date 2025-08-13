@@ -425,14 +425,6 @@ add_watermark(GimpDrawable* drawable,
         }
       }
 
-      if (i == 0 && col_offset == 8192 + 800 + 72) {
-        printf("add element: %d %d %d %d \n",
-               i,
-               col_offset,
-               original_bit_alpha,
-               bit_alpha);
-      }
-
       if (original_bit_alpha != bit_alpha) {
         // If we are adding a bit, then bit_alpha == 1 and original_bit_alpha ==
         // 0.
@@ -442,19 +434,6 @@ add_watermark(GimpDrawable* drawable,
         for (x = 0; x <= 3; x += 3) {
           for (y = 1; y <= 2; ++y) {
             int sgn = ((((x + y) % 2) == 0) ? 1 : -1) * add_subtract;
-
-            if (i == 0 && y == 1 && col_offset == 8192 + 800 + 72 && x == 0) {
-              printf("add element: %d %d %d %d 0x%.2x %d 0x%.2x %d %d \n",
-                     i,
-                     x,
-                     y,
-                     col_offset,
-                     row_arr[y][col_offset + x],
-                     sgn,
-                     (guchar)(add_16(row_arr[y][col_offset + x], sgn)),
-                     original_bit_alpha,
-                     bit_alpha);
-            }
 
             row_arr[y][col_offset + x] =
               add_16(row_arr[y][col_offset + x], sgn);
