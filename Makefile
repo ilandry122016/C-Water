@@ -13,6 +13,9 @@ watermark_32: add_watermark verify_watermark
 watermark_3024x4031: add_watermark verify_watermark
 	gimp lincoln_statue_3024x4031.png
 
+watermark_mandrill: add_watermark verify_watermark
+	gimp mandrill.tiff
+
 add_watermark: add_watermark_plugin.c
 	LIBS="-lm -ljbig -L/home/isaac/Documents/C++/BLAKE3_install/lib/ -lblake3" CFLAGS="-g -I/home/isaac/Documents/C++/BLAKE3_install/include/" gimptool-2.0 --install add_watermark_plugin.c
 

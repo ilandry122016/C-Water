@@ -341,6 +341,12 @@ add_watermark(GimpDrawable* drawable,
   printf("compressed_size: %d \n", compressed_size);
   guchar* new_bits = g_new(guchar, original_bits_size);
 
+  if (compressed_size + BLAKE3_OUT_LEN > original_bits_size) {
+    // Display a dialog.
+    g_message("Could not add the watermark because it will not fit.\n");
+    return;
+  }
+
   // The watermark is the hash of all pixels in the image and the bits
   // before modification used for watermarking in a compressed form.
 
