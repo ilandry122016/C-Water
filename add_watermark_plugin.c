@@ -42,7 +42,8 @@ add_watermark(GimpDrawable* drawable,
 // global variables
 unsigned char* compressed_data; // Compressed version of the bits used
                                 // for watermarking.
-size_t current_len = 0;
+// size of compressed data
+size_t compressed_size = 0;
 
 // Add pixel_value with the lowest bits mod 16.
 char
@@ -63,9 +64,9 @@ void
 output_bie(unsigned char* start, size_t len, void* file)
 {
   for (int i = 0; i < len; ++i) {
-    compressed_data[current_len + i] = start[i];
+    compressed_data[compressed_size + i] = start[i];
   }
-  current_len += len;
+  compressed_size += len;
 
   return;
 }
@@ -337,7 +338,7 @@ add_watermark(GimpDrawable* drawable,
   jbg_enc_free(&se); /* release allocated resources */
 
   printf("original_bits_size: %d \n", original_bits_size);
-  printf("current_len: %d \n", current_len);
+  printf("compressed_size: %d \n", compressed_size);
   guchar* new_bits = g_new(guchar, original_bits_size);
 
   // The watermark is the hash of all pixels in the image and the bits
@@ -348,15 +349,15 @@ add_watermark(GimpDrawable* drawable,
 
   // Store the bits used for watermarking (2 pixels for each 8 x 8
   // block.) in a compressed form.
-  memcpy(new_bits + BLAKE3_OUT_LEN, compressed_data, current_len);
+  memcpy(new_bits + BLAKE3_OUT_LEN, compressed_data, compressed_size);
 
   free(compressed_data);
   free(copy_bits);
 
   // Keep all the rest of the bits the same.
-  memcpy(new_bits + BLAKE3_OUT_LEN + current_len,
-         original_bits + BLAKE3_OUT_LEN + current_len,
-         original_bits_size - BLAKE3_OUT_LEN - current_len);
+  memcpy(new_bits + BLAKE3_OUT_LEN + compressed_size,
+         original_bits + BLAKE3_OUT_LEN + compressed_size,
+         original_bits_size - BLAKE3_OUT_LEN - compressed_size);
 
   for (i = y1; i < y1 + max_row_8; i += 8) {
     /* Get row i through i+7 */
