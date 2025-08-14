@@ -286,10 +286,14 @@ verify_watermark(GimpDrawable* drawable,
   }
   printf("\n");
 
-  unsigned char* bitmaps[1] = { watermark_bits };
-  // TODO: this shouldn't be bigger than 2 * watermark_bits_size. Otherwise, it
-  // won't fit. compressed_data = malloc(2 * watermark_bits_size);
+  // Check if the hash is too big to be in the watermark.
+  if (BLAKE3_OUT_LEN > watermark_bits_size) {
+    g_message("Could not recover the watermark because the hash is too big to be in the watermark");
+    return;
+  }
 
+  unsigned char* bitmaps[1] = { watermark_bits };
+  
   struct jbg_dec_state sd;
 
   jbg_dec_init(&sd);
@@ -298,7 +302,6 @@ verify_watermark(GimpDrawable* drawable,
   int jbig_result = jbg_dec_in(&sd,
                                watermark_bits + BLAKE3_OUT_LEN,
                                watermark_bits_size - BLAKE3_OUT_LEN,
-                               /* watermark_bits_size, */
                                &dec_offset);
 
   printf("jbg_strerror: %s \n", jbg_strerror(jbig_result));
@@ -311,6 +314,11 @@ verify_watermark(GimpDrawable* drawable,
 
   unsigned long result_size = jbg_dec_getsize(&sd);
   printf("result_size: %ld \n", result_size);
+
+  if (jbig_result != JBG_EOK) {
+    g_message("No watermark detected in this image.\n");
+    return;
+  }
 
   unsigned long result_width = jbg_dec_getwidth(&sd);
   unsigned long result_height = jbg_dec_getheight(&sd);

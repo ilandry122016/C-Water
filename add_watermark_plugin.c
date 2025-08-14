@@ -193,7 +193,7 @@ add_watermark(GimpDrawable* drawable,
   printf("max_col_32: %d \n ", max_col_32);
 
   int max_row_8 = height - (height % 8);
-  
+
   size_t num_blocks = (max_col_32 / 8) * (max_row_8 / 8);
   size_t original_bits_size = num_blocks / 4;
   printf("channels: %d \n ", channels);
@@ -216,7 +216,7 @@ add_watermark(GimpDrawable* drawable,
   // Initialize the hasher.
   blake3_hasher hasher;
   blake3_hasher_init(&hasher);
-  
+
   for (i = y1; i < y1 + max_row_8; i += 8) {
     /* Get row i through i+7 */
     gimp_pixel_rgn_get_row(&rgn_in, row_arr[0], x1, i, width);
@@ -341,6 +341,7 @@ add_watermark(GimpDrawable* drawable,
   printf("compressed_size: %d \n", compressed_size);
   guchar* new_bits = g_new(guchar, original_bits_size);
 
+  // Check if the new_bits can't fit the new watermark.
   if (compressed_size + BLAKE3_OUT_LEN > original_bits_size) {
     // Display a dialog.
     g_message("Could not add the watermark because it will not fit.\n");
@@ -377,13 +378,12 @@ add_watermark(GimpDrawable* drawable,
     gimp_pixel_rgn_get_row(&rgn_in, row_arr[7], x1, MIN(y2 - 1, i + 7), width);
 
     // Break up into 8x8 subblocks of pixels
-    for (gint col_offset = 0; col_offset < max_col_32;
-         col_offset += 8) {
+    for (gint col_offset = 0; col_offset < max_col_32; col_offset += 8) {
       int x_block = col_offset / 8; // the column index of each block.
       int y_block = (i - y1) / 8;   // the row index of each block
       int block_index =
-        x_block + y_block * max_col_32 /
-                    8; // there are max_col_32 / 8 blocks per row.
+        x_block +
+        y_block * max_col_32 / 8; // there are max_col_32 / 8 blocks per row.
 
       // 2 bits per block are used. Gives the byte for the block.
       int original_bit_index = block_index / 4;
