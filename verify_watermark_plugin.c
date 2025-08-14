@@ -473,4 +473,6 @@ verify_watermark(GimpDrawable* drawable,
   gimp_drawable_flush(drawable);
   gimp_drawable_merge_shadow(drawable->drawable_id, TRUE);
   gimp_drawable_update(drawable->drawable_id, x1, y1, width, height);
+
+  g_message("Image successfully restored.\n");
 }
