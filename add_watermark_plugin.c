@@ -457,23 +457,6 @@ add_watermark(GimpDrawable* drawable,
       gimp_progress_update((gdouble)(i - y1) / (gdouble)(height));
   }
 
-  {
-    // Initialize the hasher.
-    blake3_hasher hasher;
-    blake3_hasher_init(&hasher);
-
-    blake3_hasher_update(&hasher, original_bits, original_bits_size);
-
-    uint8_t blake3_hash[BLAKE3_OUT_LEN];
-    blake3_hasher_finalize(&hasher, blake3_hash, BLAKE3_OUT_LEN);
-
-    printf("original_bits hash: ");
-    for (i = 0; i < BLAKE3_OUT_LEN; ++i) {
-      printf("0x%.2x ", blake3_hash[i]);
-    }
-    printf("\n");
-  }
-
   for (i = 0; i < 8; ++i) {
     g_free(row_arr[i]);
   }

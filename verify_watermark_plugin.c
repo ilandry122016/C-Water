@@ -325,23 +325,6 @@ verify_watermark(GimpDrawable* drawable,
   printf("result_width: %ld \n", result_width);
   printf("result_height: %ld \n", result_height);
 
-  {
-    // Initialize the hasher.
-    blake3_hasher hasher;
-    blake3_hasher_init(&hasher);
-
-    blake3_hasher_update(&hasher, recovered_bits, result_size);
-
-    uint8_t blake3_hash[BLAKE3_OUT_LEN];
-    blake3_hasher_finalize(&hasher, blake3_hash, BLAKE3_OUT_LEN);
-
-    printf("recovered_bits hash: ");
-    for (i = 0; i < BLAKE3_OUT_LEN; ++i) {
-      printf("0x%.2x ", blake3_hash[i]);
-    }
-    printf("\n");
-  }
-
   // Initialize the hasher.
   blake3_hasher hasher;
   blake3_hasher_init(&hasher);
