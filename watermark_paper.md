@@ -8,24 +8,6 @@ Hyper-realistic but fake images have been a growing concern in recent years. Dig
 
 The watermark we add is a cryprographic hash of the existing image. 
 
-	static void
-	add_watermark(GimpDrawable* drawable,
-				  gint lower_limit_x,
-				  gint lower_limit_y,
-				  gint upper_limit_x,
-				  gint upper_limit_y,
-				  gint channels);
-
-
-	static void
-	verify_watermark(GimpDrawable* drawable,
-					 guchar* pixels_to_change,
-					 gint lower_limit_x,
-					 gint lower_limit_y,
-					 gint upper_limit_x,
-					 gint upper_limit_y,
-					 gint channels);
-
 `add_watermark` is a function that adds a watermark. It does do by compressing some bits of the image and squeezing the hash into the space. `verify_watermark` is a function that removes a waermark and restores the original image.
 
 If the image to be watermarked is too small, `add_watermark` will not watermark it, but will return an error.
