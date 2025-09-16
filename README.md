@@ -32,6 +32,8 @@ and squeezing the hash into the resulting space. If the image to be
 watermarked is too small, the plugin will not watermark it, but
 will instead pop up an error.
 
+### Discrete Cosine Transform ###
+
 The C-Water plugin divides the image into blocks of 8x8 pixels. GIMP
 provides the image data with the channels (e.g. rgb colors)
 interlaced. For this iteration, we do not try to separate out
@@ -40,7 +42,7 @@ image. This turns out to work out well enough for our preliminary
 implementation.
 
 Our strategy is to store 2 bits in each 8x8 pixel block. We follow the
-lead of (cite) by using specific coefficients of the discrete cosine
+lead of [4] by using specific coefficients of the discrete cosine
 transform (DCT). 
 
 The DCT is defined as
@@ -67,9 +69,11 @@ To store the 2 bits, we modify the coefficient G_66, the (6, 6)
 component of the DCT. This component tends to have very little
 signal. For example, looking at the quantization matrix for the JPEG
 standard, the (6,6) component is one of the most heavily compressed
-components of a JPEG image. (cite) Because it has very little signal,
+components of a JPEG image. [1] Because it has very little signal,
 it tends to compress well, giving us more space to store our
 watermark.
+
+### Modifying Pixels ###
 
 There is one difficulty because we want to modify by pixel
 coefficients instead of DCT coefficients. The expression
@@ -133,7 +137,9 @@ value for `s_4` which we will call `o_4`. After computing our
 watermark, we will have a new value `n_4`.  If `o_4` equals n_4, we do
 not need to change the image.
 
-If o_4 ≠ n_4, then we add or subtract to the (1,1), (2,2), (1,2) and
+### Modifying the DCT ###
+
+If `o_4 ≠ n_4`, then we add or subtract to the (1,1), (2,2), (1,2) and
 (2,1) values of the original image g_ij.  Specifically, we look at
 
 	S_mod = ((S_66_central + 8) % 16) - 8
@@ -175,6 +181,8 @@ implying that
             = ((S_66_central + 4 + 8) % 16) - 8
             = S_mod + 4
 
+### Invertible, Modular Arithmetic ###
+
 There is one problem.  The image pixels can only have values from 0
 to 255.  If we try to add 1 to 255, we overflow the image value. We
 work around this by doing all additions mod 16 on the lowest 4
@@ -193,10 +201,10 @@ and we are adding 1, then
              =  240                  + 0
              =  240
 			 
-This gives us a procedure for computing new values of g_11, g_12,
-  g_21, and g_22 such that the s_4 term of G_66_central_new becomes 0 or
-  1.  We follow a similar procedure for G_66_edge and the terms g_01,
-  g_02, g_30, and g_32.
+This gives us a procedure for computing new values of `g_11`, `g_12`,
+`g_21`, and `g_22` such that the `s_4` term of `G_66`_`central_new`
+becomes 0 or 1. We follow a similar procedure for `G_66`_edge and the
+terms `g_01`, `g_02`, `g_30`, and `g_32`.
 
 Following this procedure, we have a sequence of bits made up of the
 `s_4` bits from `G_66_central` and `G_66_edge`. This results in 2 bits
@@ -272,6 +280,28 @@ When saving the watermarked image, we have to be careful to save it
 with no lossy compression. This can significantly increase the size of
 the image.
 
+## Future Work ##
+
+Right now, for the `G_66_central` term, we always use the (1,1), (1,2),
+(2,1), and (2,2) pixels to store the watermark.  This could lead to a
+regularity in the modifications that is more noticeable.  However, there
+are 16 possible pixels we could choose for it (e.g. (5,1), (6,5), etc.).
+Following [3], we could randomize the selection of pixels by using
+bits from the 256 bit Blake3 hash of the image.  Using 4 bits of the
+hash we can map uniquely to one of the 16 pixels.  We continue using
+successive values of the hash to select 4 pixels, discarding duplicates.
+When we run out of bits from the original Blake3 hash, we generate bits
+by successively hashing the original hash.
+
+Note that this scheme does not affect how we read the watermark of an
+image.  So we can recover the original Blake3 hash in the same
+manner. However, it does affect how we restore the original image.
+Because we already have the original Blake3 hash, we can use it to
+reverse the procedure and recover the original image.
+
+We can use a similar procedure for the `G_66_edge` terms to select from
+the 32 possible pixels.
+
 References:
 
 [1] J. Fridrich, M. Goljan and Rui Du, "Invertible authentication watermark for JPEG images," Proceedings International Conference on Information Technology: Coding and Computing, Las Vegas, NV, USA, 2001, pp. 223-227, doi: 10.1109/ITCC.2001.918795. keywords: {Authentication;Watermarking;Digital images;Biomedical imaging;Intelligent systems;Image coding;Transform coding;Quantization;Discrete cosine transforms;Protection},
@@ -279,3 +309,5 @@ References:
 [2] M. M. Yeung and F. Mintzer, "An invisible watermarking technique for image verification," Proceedings of International Conference on Image Processing, Santa Barbara, CA, USA, 1997, pp. 680-683 vol.2, doi: 10.1109/ICIP.1997.638587. keywords: {Watermarking;Gray-scale;Decoding;Protection},
 
 [3] Jessica Fridrich, Miroslav Goljan, and Rui Du "Invertible authentication", Proc. SPIE 4314, Security and Watermarking of Multimedia Contents III, (1 August 2001); https://doi.org/10.1117/12.435400 
+
+[4] "The Discrete Cosine Transform" Stanford. https://cs.stanford.edu/people/eroberts/courses/soco/projects/data-compression/lossy/jpeg/dct.htm (accessed September 15, 2025)
