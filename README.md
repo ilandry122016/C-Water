@@ -47,25 +47,32 @@ transform (DCT).
 
 The DCT is defined as
 	 
+```math
 	G_lm = Σ_ij(M_lm_ij * g_ij)
+```
 
 where
 
+```math
 	M_lm_ij = cos((2i + 1)l pi/16) cos((2j + 1)m pi/16)
+```
 	
 and `g_ij` is the offset grayscale values.  GIMP provides the values
 as `b_ij`, an unsigned byte from 0 to 255.  We convert to a signed
 value by offsetting `b_ij`.
 
+```math
 	g_ij = b_ij - 128
-	
+```
+
 Note that the DCT is not a matrix multiplication, but an element-wise
 sum of the product. So
 
+```math
 	G_lm = (M_lm_00 * g_00) + (M_lm_01 * g_01) + (M_lm_02 * g_02) + ...
-	
+```
 
-To store the 2 bits, we modify the coefficient G_66, the (6, 6)
+To store the 2 bits, we modify the coefficient `G_66`, the (6, 6)
 component of the DCT. This component tends to have very little
 signal. For example, looking at the quantization matrix for the JPEG
 standard, the (6,6) component is one of the most heavily compressed
@@ -79,10 +86,13 @@ There is one difficulty because we want to modify by pixel
 coefficients instead of DCT coefficients. The expression
 for G_66 is
 
+```math
 	G_66 = Σ_ij(M_66_ij * g_ij)
-		
+```	
+	
 The structure of the M_66_ij matrix is very regular.
    
+```math
                 |  1 - α      -α       α  -1 + α  -1 + α       α      -α  1 - α |
                 |     -α   1 + α  -1 - α       α       α  -1 - α   1 + α     -α |
                 |      α  -1 + α   1 + α      -α      -α   1 + α  -1 - α      α |
@@ -91,21 +101,24 @@ The structure of the M_66_ij matrix is very regular.
                 |      α  -1 + α   1 + α      -α      -α   1 + α  -1 - α      α |
                 |     -α   1 + α  -1 - α       α       α  -1 - α   1 + α     -α |
                 |  1 - α      -α       α  -1 + α  -1 + α       α      -α  1 - α |
+```
 
 where α = sqrt(2) / 2.
 
 Notice that there are three kinds of terms with magnitudes of 
 
-* 1 + α
-* α
-* 1 - α
+	* 1 + α
+	* α
+	* 1 - α
 
 These terms are located in the center, the edge, or the corners of the
 4x4 subblock respectively. So we define these components of `G_66` as
 `G_66_central`, `G_66_edge`, and `G_66_corner`.
 
+```math
 	G_66 = G_66_central + G_66_edge + G_66_corner
-	
+```
+
 The `G_66_central` terms are the largest (~1.7071), followed by the
 `G_66_edge` terms (~0.7071) and the `G_66_corner` terms
 (~0.2928). Therefore, to have the largest effect on `G_66`, we modify
@@ -115,34 +128,42 @@ Looking first at G_66_central, all the coefficients for G_66_central
 have the same magnitude.  So we can define S_66_central as a signed
 sum of terms.
 
+```math
 	S_66_central ≡ (g_11 + g_22 - g_12 - g_21)
 		         - (g_15 + g_26 - g_16 - g_25)
 				 - (g_51 + g_62 - g_52 - g_61) 
 				 + (g_55 + g_66 - g_56 - g_65)
+```
 
 And then
 
+```math
 	G_66_central = (1 + α) * S_66_central
+```
 
-All of the terms that make up S_66_central are 8 bit
-integers. Therefore S_66_central is also an integer. We store the hash
-in the third least significant bit of S_66_central. So if we write
-S_66_central as a sum of powers of 2,
+All of the terms that make up `S_66_central` are 8 bit
+integers. Therefore `S_66_central` is also an integer. We store the hash
+in the third least significant bit of `S_66_central`. So if we write
+`S_66_central` as a sum of powers of 2,
 
+```math
 	S_66_central = s_1 * 1 + s_2 * 2 + s_4 * 4 + s_8 * 8 + s_16 * 16 + ...
+```
 
 we will use the `s_4` term. The lowest bits, `s_1` and `s_2`, turn out
-not to compress very well.The original image will have some original
+not to compress very well. The original image will have some original
 value for `s_4` which we will call `o_4`. After computing our
-watermark, we will have a new value `n_4`.  If `o_4` equals n_4, we do
+watermark, we will have a new value `n_4`.  If `o_4` equals `n_4`, we do
 not need to change the image.
 
 ### Modifying the DCT ###
 
 If `o_4 ≠ n_4`, then we add or subtract to the (1,1), (2,2), (1,2) and
-(2,1) values of the original image g_ij.  Specifically, we look at
+(2,1) values of the original image `g_ij.  Specifically, we look at
 
+```math
 	S_mod = ((S_66_central + 8) % 16) - 8
+```
 	
 This results in a number from -8 to 7. We use the expression because
 if `o_4=0`, then `S_mod` will be close to zero. Specifically, it will
@@ -158,28 +179,36 @@ For example, if `o_4=0` and `S_mod>=0`, then we can add 4 to
   
 resulting in
 
+```math
 	S_66_central_new = S_66_central + 4
+```
 
-The new S_mod_new will then be
+The new `S_mod_new` will then be
 
+```math
 	S_mod_new = ((S_66_central_new + 8) % 16) - 8
 		      = ((S_66_central + 4 + 8) % 16) - 8
               = S_mod + 4
+```
 
-To set it to 1, we can then either add 4 if S_mod >=
-0, or subtract 4 if S_mod < 0.
+To set it to 1, we can then either add 4 if `S_mod` >=
+0, or subtract 4 if `S_mod` < 0.
 
-Suppose that S_mod >=0.  Then we add 1 to the (1,1) and (2,2) values
-of the original image values of g_ij, and subtract 1 from the (1,2)
-and (2,1) values of g_ij.  This will mean that
+Suppose that `S_mod` >=0.  Then we add 1 to the (1,1) and (2,2) values
+of the original image values of `g_ij`, and subtract 1 from the (1,2)
+and (2,1) values of `g_ij`.  This will mean that
 
+```math
 	S_66_central_new = S_66_central + 4
+```
 
 implying that
 
+```math
 	S_mod_new = ((S_66_central_new + 8) % 16) - 8
             = ((S_66_central + 4 + 8) % 16) - 8
             = S_mod + 4
+```
 
 ### Invertible, Modular Arithmetic ###
 
@@ -188,22 +217,28 @@ to 255.  If we try to add 1 to 255, we overflow the image value. We
 work around this by doing all additions mod 16 on the lowest 4
 bits. So we get
 
+```math
 	g_ij_new = (g_ij - (g_ij % 16))  + ((g_ij ± 1) % 16)
+```
 
 If
 
+```math
 	g_11 == 255
+```
 
 and we are adding 1, then
 
+```math
     g_11_new = (g_11 - (g_11 % 16))  + ((g_11 + 1) % 16)
              =  255  -  15           + (256        % 16)
              =  240                  + 0
              =  240
-			 
+```
+	
 This gives us a procedure for computing new values of `g_11`, `g_12`,
-`g_21`, and `g_22` such that the `s_4` term of `G_66`_`central_new`
-becomes 0 or 1. We follow a similar procedure for `G_66`_edge and the
+`g_21`, and `g_22` such that the `s_4` term of `G_66_central_new`
+becomes 0 or 1. We follow a similar procedure for `G_66_edge` and the
 terms `g_01`, `g_02`, `g_30`, and `g_32`.
 
 Following this procedure, we have a sequence of bits made up of the
@@ -279,6 +314,12 @@ After (zoomed):
 When saving the watermarked image, we have to be careful to save it
 with no lossy compression. This can significantly increase the size of
 the image.
+
+## Discussion ##
+
+The first issue we encountered was when the watermarking of the pixels was too visible. This was caused by the overflow in the rgb values. So changing from addition to addition mod 256 resolved the issue.
+
+The second issue was when the program crashed because the width or height of the image was not in units of 8 pixels. This was resolved by setting the program to not watermark the pixels if they do not form in units of 8x8.
 
 ## Future Work ##
 
