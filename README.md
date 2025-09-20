@@ -35,7 +35,7 @@ will instead pop up an error.
 ### Discrete Cosine Transform ###
 
 The C-Water plugin divides the image into blocks of 8x8 pixels. GIMP
-provides the image data with the channels (e.g. rgb colors)
+provides the image data with the channels (e.g. RGB colors)
 interlaced. For this iteration, we do not try to separate out
 channels. Instead, we treat the whole image as a giant grayscale
 image. This turns out to work out well enough for our preliminary
@@ -48,18 +48,18 @@ transform (DCT).
 The DCT is defined as
 	 
 ```math
-	G_{lm} = Σ_{ij}(M_{lm}_{ij} * g_{ij})
+	G_{lm} = Σ_{ij}(M_{lm\_ij} * g_{ij})
 ```
 
 where
 
 ```math
-	M_{lm}_{ij} = cos((2i + 1)l pi/16) cos((2j + 1)m pi/16)
+	M_{lm\_ij} = cos((2i + 1)l pi/16) cos((2j + 1)m pi/16)
 ```
 	
-and $`g_ij`$ is the offset grayscale values.  GIMP provides the values
-as $`b_ij`$, an unsigned byte from 0 to 255.  We convert to a signed
-value by offsetting $`b_ij`$.
+and `g_{ij}` is the offset grayscale values.  GIMP provides the values
+as `b_{ij}`, an unsigned byte from 0 to 255.  We convert to a signed
+value by offsetting `b_{ij}`.
 
 ```math
 	g_{ij} = b_{ij} - 128
@@ -69,10 +69,10 @@ Note that the DCT is not a matrix multiplication, but an element-wise
 sum of the product. So
 
 ```math
-	G_{lm} = (M_{lm}_{00} * g_{00}) + (M_{lm}_{01} * g_{01}) + (M_{lm}_{02} * g_{02}) + ...
+	G_{lm} = (M_{lm\_00} * g_{00}) + (M_{lm\_01} * g_{01}) + (M_{lm\_02} * g_{02}) + ...
 ```
 
-To store the 2 bits, we modify the coefficient $`G_66`$, the (6, 6)
+To store the 2 bits, we modify the coefficient `G_{66}`, the (6, 6)
 component of the DCT. This component tends to have very little
 signal. For example, looking at the quantization matrix for the JPEG
 standard, the (6,6) component is one of the most heavily compressed
@@ -84,23 +84,23 @@ watermark.
 
 There is one difficulty because we want to modify by pixel
 coefficients instead of DCT coefficients. The expression
-for $`G_66`$ is
+for `G_{66}` is
 
 ```math
-	G_{66} = Σ_{ij}(M_{66}_{ij} * g_{ij})
+	G_{66} = Σ_{ij}(M_{66\_ij} * g_{ij})
 ```	
 	
-The structure of the $`M_66_ij`$ matrix is very regular.
+The structure of the `M_{66\_ij}` matrix is very regular.
    
 ```math
-	                |  1 - α      -α       α  -1 + α  -1 + α       α      -α  1 - α |
-					|     -α   1 + α  -1 - α       α       α  -1 - α   1 + α     -α |
-					|      α  -1 + α   1 + α      -α      -α   1 + α  -1 - α      α |
-	M_{66}_{ij} =   | -1 + α       α      -α   1 - α   1 - α      -α       α -1 + α |
-		            | -1 + α       α      -α   1 - α   1 - α      -α       α -1 + α |
-                    |      α  -1 + α   1 + α      -α      -α   1 + α  -1 - α      α |
-                    |     -α   1 + α  -1 - α       α       α  -1 - α   1 + α     -α |
-                    |  1 - α      -α       α  -1 + α  -1 + α       α      -α  1 - α |
+                   |  1 - α      -α       α  -1 + α  -1 + α       α      -α  1 - α |
+                   |     -α   1 + α  -1 - α       α       α  -1 - α   1 + α     -α |
+                   |      α  -1 + α   1 + α      -α      -α   1 + α  -1 - α      α |
+	M_{66\_ij} =   | -1 + α       α      -α   1 - α   1 - α      -α       α -1 + α |
+                   | -1 + α       α      -α   1 - α   1 - α      -α       α -1 + α |
+                   |      α  -1 + α   1 + α      -α      -α   1 + α  -1 - α      α |
+                   |     -α   1 + α  -1 - α       α       α  -1 - α   1 + α     -α |
+                   |  1 - α      -α       α  -1 + α  -1 + α       α      -α  1 - α |
 ```
 
 where α = sqrt(2) / 2.
@@ -112,67 +112,67 @@ Notice that there are three kinds of terms with magnitudes of
 	* 1 - α
 
 These terms are located in the center, the edge, or the corners of the
-4x4 subblock respectively. So we define these components of $`G_{66}`$ as
-$`G_{66}_{central}`$, $`G_{66}_{edge}`$, and $`G_{66}_{corner}`$.
+4x4 subblock respectively. So we define these components of `G_{66}` as
+`G_{66\_central}`, `G_{66\_edge}`, and `G_{66\_corner}`.
 
 ```math
-	G_{66} = G_{66}_{central} + G_{66}_{edge} + G_{66}_{corner}
+	G_{66} = G_{66\_central} + G_{66\_edge} + G_{66\_corner}
 ```
 
-The $`G_{66}_{central}`$ terms are the largest (~1.7071), followed by the
-$`G_{66}_{edge}`$ terms (~0.7071) and the $`G_{66}_{corner}`$ terms
-(~0.2928). Therefore, to have the largest effect on $`G_{66}`$, we modify
-the $`G_{66}_{central}`$ and $`G_{66}_{edge}`$ terms.
+The `G_{66\_central}` terms are the largest (~1.7071), followed by the
+`G_{66\_edge}` terms (~0.7071) and the `G_{66\_corner}` terms
+(~0.2928). Therefore, to have the largest effect on `G_{66}`, we modify
+the `G_{66\_central}` and `G_{66\_edge}` terms.
 
-Looking first at $`G_{66}_{central}`$, all the coefficients for $`G_{66}_{central}`$
-have the same magnitude.  So we can define $`S_{66}_{central}`$ as a signed
+Looking first at `G_{66\_central}`, all the coefficients for `G_{66\_central}`
+have the same magnitude.  So we can define `S_{66\_central}` as a signed
 sum of terms.
 
 ```math
-	S_{66}_{central} ≡ (g_{11} + g_{22} - g_{12} - g_{21})
-		             - (g_{15} + g_{26} - g_{16} - g_{25})
-				     - (g_{51} + g_{62} - g_{52} - g_{61}) 
-				     + (g_{55} + g_{66} - g_{56} - g_{65})
+	S_{66\_central} ≡ (g_{11} + g_{22} - g_{12} - g_{21})
+		            - (g_{15} + g_{26} - g_{16} - g_{25})
+				    - (g_{51} + g_{62} - g_{52} - g_{61}) 
+					+ (g_{55} + g_{66} - g_{56} - g_{65})
 ```
 
 And then
 
 ```math
-	G_{66}_{central} = (1 + α) * S_{66}_{central}
+	G_{66\_central} = (1 + α) * S_{66\_central}
 ```
 
-All of the terms that make up $`S_{66}_{central}`$ are 8 bit
-integers. Therefore $`S_{66}_{central}`$ is also an integer. We store the hash
-in the third least significant bit of $`S_{66}_{central}`$. So if we write
-$`S_{66}_{central}`$ as a sum of powers of 2,
+All of the terms that make up `S_{66\_central}` are 8 bit
+integers. Therefore `S_{66\_central}` is also an integer. We store the hash
+in the third least significant bit of `S_{66\_central}`. So if we write
+`S_{66\_central}` as a sum of powers of 2,
 
 ```math
-	S_{66}_{central} = s_{1} * 1 + s_{2} * 2 + s_{4} * 4 + s_{8} * 8 + s_{16} * 16 + ...
+	S_{66\_central} = s_{1} * 1 + s_{2} * 2 + s_{4} * 4 + s_{8} * 8 + s_{16} * 16 + ...
 ```
 
-we will use the $`s_{4}`$ term. The lowest bits, $`s_{1}`$ and $`s_{2}`$, turn out
+we will use the `s_{4}` term. The lowest bits, `s_{1}` and `s_{2}`, turn out
 not to compress very well. The original image will have some original
-value for $`s_{4}`$ which we will call $`o_{4}`$. After computing our
-watermark, we will have a new value $`n_{4}`$.  If $`o_{4}`$ equals $`n_{4}`$, we do
+value for `s_{4}` which we will call `o_{4}`. After computing our
+watermark, we will have a new value `n_{4}`.  If `o_{4}` equals `n_{4}`, we do
 not need to change the image.
 
 ### Modifying the DCT ###
 
-If $`o_{4} ≠ n_{4}`$, then we add or subtract to the (1,1), (2,2), (1,2) and
-(2,1) values of the original image $`g_ij`$.  Specifically, we look at
+If `o_{4} ≠ n_{4}`, then we add or subtract to the (1,1), (2,2), (1,2) and
+(2,1) values of the original image `g_{ij}`.  Specifically, we look at
 
 ```math
-	S_{mod} = ((S_{66}_{central} + 8) % 16) - 8
+	S_{mod} = ((S_{66\_central} + 8) % 16) - 8
 ```
 	
 This results in a number from -8 to 7. We use the expression because
-if $`o_{4}=0`$, then $`S_{mod}`$ will be close to zero. Specifically, it will
-be in the range [-4, 3]. If $`o_{4}=1`$, then S_mod will be in either the
-range [-8,5] or [4,7].  Therefore, we can flip the $`o_{4}`$ bit by adding
+if `o_{4}=0`, then `S_{mod}` will be close to zero. Specifically, it will
+be in the range [-4, 3]. If `o_{4}=1`, then S_mod will be in either the
+range [-8,5] or [4,7].  Therefore, we can flip the `o_{4}` bit by adding
 or subtracting 4.
 
-For example, if $`o_{4}=0`$ and $`S_{mod}>=0`$, then we can add 4 to
-$`S_{central}`$ by:
+For example, if `o_{4}=0` and `S_{mod}>=0`, then we can add 4 to
+`S_{central}` by:
 
   * Adding 1 to the (1,1) and (2,2)
   * Subtracting 1 from (1,2) and (2,1)
@@ -180,34 +180,35 @@ $`S_{central}`$ by:
 resulting in
 
 ```math
-	S_{66}_{central}_{new} = S_{66}_{central} + 4
+	S_{66\_central\_new} = S_{66\_central} + 4
 ```
 
-The new $`S_{mod}_{new}`$ will then be
+The new `S_{mod\_new}` will then be
 
 ```math
-	S_{mod}_{new} = ((S_{66}_{central}_{new} + 8) % 16) - 8
-		      = ((S_{66}_{central} + 4 + 8) % 16) - 8
+	S_{mod\_new} = ((S_{66\_central\_new} + 8) % 16) - 8
+		      = ((S_{66\_central} + 4 + 8) % 16) - 8
               = S_{mod} + 4
 ```
 
-To set it to 1, we can then either add 4 if $`S_{mod}`$ >=
-0, or subtract 4 if $`S_{mod}`$ < 0.
+To set it to 1, we can then either add 4 if `S_{mod}` >=
+0, or subtract 4 if `S_{mod}` < 0.
 
-Suppose that $`S_{mod}`$ >=0.  Then we add 1 to the (1,1) and (2,2) values
-of the original image values of $`g_{ij}`$, and subtract 1 from the (1,2)
-and (2,1) values of $`g_{ij}`$.  This will mean that
+Suppose that `S_{mod}` >=0.  Then we add 1 to the (1,1) and (2,2) values
+of the original image values of `g_{ij}`, and subtract 1 from the (1,2)
+and (2,1) values of `g_{ij}`.  This will mean that
 
 ```math
-	S_{66}_{central}_{new} = S_{66}_{central} + 4
+	S_{66\_central\_new} = S_{66\_central} + 4
+>>>>>>> 6779cf3 (Formatted README.md.)
 ```
 
 implying that
 
 ```math
-	S_{mod}_{new} = ((S_{66}_{central}_{new} + 8) % 16) - 8
-            = ((S_{66}_{central} + 4 + 8) % 16) - 8
-            = S_{mod} + 4
+	S_{mod\_new} = ((S_{66\_central\_new} + 8) % 16) - 8
+		         = ((S_{66\_central} + 4 + 8) % 16) - 8
+                 = S_{mod} + 4
 ```
 
 ### Invertible, Modular Arithmetic ###
@@ -218,7 +219,7 @@ work around this by doing all additions mod 16 on the lowest 4
 bits. So we get
 
 ```math
-	g_{ij}_{new} = (g_{ij} - (g_{ij} % 16))  + ((g_{ij} ± 1) % 16)
+	g_{ij\_new} = (g_{ij} - (g_{ij} % 16))  + ((g_{ij} ± 1) % 16)
 ```
 
 If
@@ -230,19 +231,19 @@ If
 and we are adding 1, then
 
 ```math
-    g_{11}_{new} = (g_{11} - (g_{11} % 16))  + ((g_{11} + 1) % 16)
-		         =  255    -  15             + (256          % 16)
-                 =  240                      + 0
-                 =  240
+    g_{11\_new} = (g_{11} - (g_{11} % 16))  + ((g_{11} + 1) % 16)
+                =  255    -  15             + (256        % 16)
+                =  240                      + 0
+                =  240
 ```
 	
-This gives us a procedure for computing new values of $`g_{11}`$, $`g_{12}`$,
-$`g_{21}`$, and $`g_{22}`$ such that the $`s_{4}`$ term of $`G_{66}_{central}_{new}`$
-becomes 0 or 1. We follow a similar procedure for $`G_{66}_{edge}`$ and the
-terms $`g_{01}`$, $`g_{02}`$, $`g_{30}`$, and $`g_{32}`$.
+This gives us a procedure for computing new values of `g_{11}`, `g_{12}`,
+`g_{21}`, and `g_{22}` such that the `s_{4}` term of `G{_66\_central\_new}`
+becomes 0 or 1. We follow a similar procedure for `G_{66\_edge}` and the
+terms `g_{01}`, `g_{02}`, `g_{30}`, and `g_{32}`.
 
 Following this procedure, we have a sequence of bits made up of the
-$`s_{4}`$ bits from $`G_{66}_{central}`$ and $`G_{66}_{edge}`$. This results in 2 bits
+`s_{4}` bits from `G_{66\_central}` and `G_{66\_edge}`. This results in 2 bits
 per 8x8 block. Following the example of (Fridrich, Goljan, Du etc.),
 we compress the bits using JBIG.
 
@@ -271,13 +272,13 @@ hash.
 ### Verification and Recovery###
 
 Using the procedure detailed in the first section, we extract the new
-bits $`n_{4}`$ from an image. That gives us both the `BLAKE_3` hash of the
-original image and the compressed bits $`o_{4}`$ of the original image. We
+bits `n_{4}` from an image. That gives us both the `BLAKE\_3` hash of the
+original image and the compressed bits `o_{4}` of the original image. We
 uncompress the compressed bits and use the procedure from the first
 section to reset the pixels back to the original values.
 
 Now that we have recovered the original image, we compute the
-`BLAKE_3` hash of the recovered image and make sure that it is the
+`BLAKE\_3` hash of the recovered image and make sure that it is the
 same as the embedded BLAKE3 hash. This ensures that the image was
 watermarked and that we have recovered the original correctly.
 
@@ -317,13 +318,18 @@ the image.
 
 ## Discussion ##
 
-The first issue we encountered was when the watermarking of the pixels was too visible. This was caused by the overflow in the rgb values. So changing from addition to addition mod 256 resolved the issue.
+The first issue we encountered was when the watermarking of the pixels
+was too visible. This was caused by the overflow in the rgb values. So
+changing from addition to addition mod 256 resolved the issue.
 
-The second issue was when the program crashed because the width or height of the image was not in units of 8 pixels. This was resolved by setting the program to not watermark the pixels if they do not form in units of 8x8.
+The second issue was when the program crashed because the width or
+height of the image was not in units of 8 pixels. This was resolved by
+setting the program to not watermark the pixels if they do not form in
+units of 8x8.
 
 ## Future Work ##
 
-Right now, for the $`G_{66}_{central}`$ term, we always use the (1,1), (1,2),
+Right now, for the `G_{66\_central}` term, we always use the (1,1), (1,2),
 (2,1), and (2,2) pixels to store the watermark.  This could lead to a
 regularity in the modifications that is more noticeable.  However, there
 are 16 possible pixels we could choose for it (e.g. (5,1), (6,5), etc.).
@@ -340,7 +346,7 @@ manner. However, it does affect how we restore the original image.
 Because we already have the original Blake3 hash, we can use it to
 reverse the procedure and recover the original image.
 
-We can use a similar procedure for the $`G_{66}_{edge}`$ terms to select from
+We can use a similar procedure for the `G_{66\_edge}` terms to select from
 the 32 possible pixels.
 
 References:
