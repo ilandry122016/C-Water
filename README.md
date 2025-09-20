@@ -23,7 +23,7 @@ and image recovery as GIMP plugins.
 ## Method ##
 
 The watermark we add is a cryprographic hash of the existing image. We
-have implemented a 256-bit Blake3 hash, though it would be simple
+have implemented a 256-bit BLAKE3 hash, though it would be simple
 enough to extend it to any digital signature that is 256 bits or
 smaller.
 
@@ -225,7 +225,7 @@ and we are adding 1, then
 	
 This gives us a procedure for computing new values of $`g_{11}`$,
 $`g_{12}`$, $`g_{21}`$, and $`g_{22}`$ such that the $`s_{4}`$ term of
-$`G{_66\_central\_new}`$ becomes 0 or 1. We follow a similar procedure
+$`G_{66\_central\_new}`$ becomes 0 or 1. We follow a similar procedure
 for $`G_{66\_edge}`$ and the terms $`g_{01}`$, $`g_{02}`$, $`g_{30}`$,
 and $`g_{32}`$.
 
@@ -259,16 +259,15 @@ hash.
 ### Verification and Recovery ###
 
 Using the procedure detailed in the first section, we extract the new
-bits $`n_{4}`$ from an image. That gives us both the $`BLAKE\_3`$ hash
-of the original image and the compressed bits $`o_{4}`$ of the
-original image. We uncompress the compressed bits and use the
-procedure from the first section to reset the pixels back to the
-original values.
+bits $`n_{4}`$ from an image. That gives us both the BLAKE3 hash of
+the original image and the compressed bits $`o_{4}`$ of the original
+image. We uncompress the compressed bits and use the procedure from
+the first section to reset the pixels back to the original values.
 
-Now that we have recovered the original image, we compute the
-$`BLAKE3`$ hash of the recovered image and make sure that it is the
-same as the embedded BLAKE3 hash. This ensures that the image was
-watermarked and that we have recovered the original correctly.
+Now that we have recovered the original image, we compute the BLAKE3
+hash of the recovered image and make sure that it is the same as the
+embedded BLAKE3 hash. This ensures that the image was watermarked and
+that we have recovered the original correctly.
 
 If the image is recovered, then we pop up the message: "Image
 successfully restored."
@@ -314,17 +313,17 @@ Right now, for the $`G_{66\_central}`$ term, we always use the (1,1),
 lead to a regularity in the modifications that is more noticeable.
 However, there are 16 possible pixels we could choose for it
 (e.g. (5,1), (6,5), etc.).  Following [3], we could randomize the
-selection of pixels by using bits from the 256 bit Blake3 hash of the
+selection of pixels by using bits from the 256 bit BLAKE3 hash of the
 image.  Using 4 bits of the hash we can map uniquely to one of the 16
 pixels.  We continue using successive values of the hash to select 4
 pixels, discarding duplicates.  When we run out of bits from the
-original Blake3 hash, we generate bits by successively hashing the
+original BLAKE3 hash, we generate bits by successively hashing the
 original hash.
 
 Note that this scheme does not affect how we read the watermark of an
-image.  So we can recover the original Blake3 hash in the same
+image.  So we can recover the original BLAKE3 hash in the same
 manner. However, it does affect how we restore the original image.
-Because we already have the original Blake3 hash, we can use it to
+Because we already have the original BLAKE3 hash, we can use it to
 reverse the procedure and recover the original image.
 
 We can use a similar procedure for the $`G_{66\_edge}`$ terms to
