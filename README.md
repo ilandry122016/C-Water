@@ -321,16 +321,7 @@ When saving the watermarked image, we have to be careful to save it
 with no lossy compression. This can significantly increase the size of
 the image.
 
-## Discussion ##
 
-The first issue we encountered was when the watermarking of the pixels
-was too visible. This was caused by the overflow in the rgb values. So
-changing from addition to addition mod 256 resolved the issue.
-
-The second issue was when the program crashed because the width or
-height of the image was not in units of 8 pixels. This was resolved by
-setting the program to not watermark the pixels if they do not form in
-units of 8x8.
 
 ## Future Work ##
 
