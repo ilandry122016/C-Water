@@ -165,7 +165,7 @@ If $`o_{4} ≠ n_{4}`$, then we add or subtract to the (1,1), (2,2),
 Specifically, we look at
 
 ```math
-	S_{mod} = ((S_{66\_central} + 8) % 16) - 8
+	S_{mod} = ((S_{66\_central} + 8) \% 16) - 8
 ```
 	
 This results in a number from -8 to 7. We use the expression because
@@ -177,8 +177,8 @@ $`o_{4}`$ bit by adding or subtracting 4.
 For example, if $`o_{4}=0`$ and $`S_{mod}>=0`$, then we can add 4 to
 $`S_{central}`$ by:
 
-  * Adding 1 to the (1,1) and (2,2)
-  * Subtracting 1 from (1,2) and (2,1)
+  * Adding 1 to the (1,1) and (2,2) terms
+  * Subtracting 1 from (1,2) and (2,1) terms
   
 resulting in
 
@@ -189,29 +189,13 @@ resulting in
 The new $`S_{mod\_new}`$ will then be
 
 ```math
-	S_{mod\_new} = ((S_{66\_central\_new} + 8) % 16) - 8
-		      = ((S_{66\_central} + 4 + 8) % 16) - 8
+	S_{mod\_new} = ((S_{66\_central\_new} + 8) \% 16) - 8
+		      = ((S_{66\_central} + 4 + 8) \% 16) - 8
               = S_{mod} + 4
 ```
 
 To set it to 1, we can then either add 4 if $`S_{mod}`$ >= 0, or
 subtract 4 if $`S_{mod}`$ < 0.
-
-Suppose that $`S_{mod}`$ >=0.  Then we add 1 to the (1,1) and (2,2)
-values of the original image values of $`g_{ij}`$, and subtract 1 from
-the (1,2) and (2,1) values of $`g_{ij}`$.  This will mean that
-
-```math
-	S_{66\_central\_new} = S_{66\_central} + 4
-```
-
-implying that
-
-```math
-	S_{mod\_new} = ((S_{66\_central\_new} + 8) % 16) - 8
-		         = ((S_{66\_central} + 4 + 8) % 16) - 8
-                 = S_{mod} + 4
-```
 
 ### Invertible, Modular Arithmetic ###
 
@@ -221,7 +205,7 @@ work around this by doing all additions mod 16 on the lowest 4
 bits. So we get
 
 ```math
-	g_{ij\_new} = (g_{ij} - (g_{ij} % 16))  + ((g_{ij} ± 1) % 16)
+	g_{ij\_new} = (g_{ij} - (g_{ij} \% 16))  + ((g_{ij} ± 1) \% 16)
 ```
 
 If
@@ -233,8 +217,8 @@ If
 and we are adding 1, then
 
 ```math
-    g_{11\_new} = (g_{11} - (g_{11} % 16))  + ((g_{11} + 1) % 16)
-                =  255    -  15             + (256        % 16)
+    g_{11\_new} = (g_{11} - (g_{11} \% 16))  + ((g_{11} + 1) \% 16)
+                =  255    -  15             + (256        \% 16)
                 =  240                      + 0
                 =  240
 ```
@@ -282,7 +266,7 @@ procedure from the first section to reset the pixels back to the
 original values.
 
 Now that we have recovered the original image, we compute the
-$`BLAKE\_3`$ hash of the recovered image and make sure that it is the
+$`BLAKE3`$ hash of the recovered image and make sure that it is the
 same as the embedded BLAKE3 hash. This ensures that the image was
 watermarked and that we have recovered the original correctly.
 
