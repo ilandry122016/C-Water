@@ -241,7 +241,7 @@ hash bits and JBIG compressed bits is our new set of bits.
 Using the procedure detailed above, we modify the original image to
 set the new bits.
 
-#### Limitations####
+#### Limitations ####
 
 The BLAKE3 hash is 256 bits, and the JBIG compression routine has a
 fixed header of 40 bytes = 320 bits (8 bits per byte => 40 bytes * 8
