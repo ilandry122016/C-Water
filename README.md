@@ -104,13 +104,13 @@ The structure of the $`M_{66\_ij}`$ matrix is very regular.
 	\end{bmatrix}
 ```
 
-where α = sqrt(2) / 2.
+where $`α = \sqrt(2) / 2`$.
 
 Notice that there are three kinds of terms with magnitudes of
 
-	* 1 + α
-	* α
-	* 1 - α
+	* 1 + α = 1.7071
+	* α     = 0.7071
+	* 1 - α = 0.2928
 
 These terms are located in the center, the edge, or the corners of the
 4x4 subblock respectively. So we define these components of $`G_{66}`$
@@ -120,9 +120,9 @@ as $`G_{66\_central}`$, $`G_{66\_edge}`$, and $`G_{66\_corner}`$.
 	G_{66} = G_{66\_central} + G_{66\_edge} + G_{66\_corner}
 ```
 
-The $`G_{66\_central}`$ terms are the largest (~1.7071), followed by
-the $`G_{66\_edge}`$ terms (~0.7071) and the $`G_{66\_corner}`$ terms
-(~0.2928). Therefore, to have the largest effect on $`G_{66}`$, we
+The $`G_{66\_central}`$ terms are the largest (1 + α), followed by
+the $`G_{66\_edge}`$ terms (α) and the $`G_{66\_corner}`$ terms
+(1 - α). Therefore, to have the largest effect on $`G_{66}`$, we
 modify the $`G_{66\_central}`$ and $`G_{66\_edge}`$ terms.
 
 Looking first at $`G_{66\_central}`$, all the coefficients for
