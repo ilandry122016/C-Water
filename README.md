@@ -104,7 +104,7 @@ The structure of the $`M_{66\_ij}`$ matrix is very regular.
 	\end{bmatrix}
 ```
 
-where $`α = 1 / \sqrt(2)`$.
+where $`α = 1 / \sqrt{2}`$.
 
 Notice that there are three kinds of terms with magnitudes of
 
