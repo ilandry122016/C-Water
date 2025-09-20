@@ -54,7 +54,7 @@ The DCT is defined as
 where
 
 ```math
-	M_{lm\_ij} = cos((2i + 1)l pi/16) cos((2j + 1)m pi/16)
+	M_{lm\_ij} = cos((2i + 1)l \pi/16) cos((2j + 1)m \pi/16)
 ```
 	
 and `g_{ij}` is the offset grayscale values.  GIMP provides the values
