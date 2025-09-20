@@ -108,9 +108,9 @@ where $`α = \sqrt(2) / 2`$.
 
 Notice that there are three kinds of terms with magnitudes of
 
-	* 1 + α \approx 1.7071
-	* α     \approx 0.7071
-	* 1 - α \approx 0.2928
+	* 1 + α = 1.7071
+	* α     = 0.7071
+	* 1 - α = 0.2928
 
 These terms are located in the center, the edge, or the corners of the
 4x4 subblock respectively. So we define these components of $`G_{66}`$
